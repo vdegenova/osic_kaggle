@@ -1,9 +1,29 @@
+# Local caches
 .ipynb_checkpoints/
-<<<<<<< HEAD
 __pycache__/
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+sdist/
+var/
+wheels/
+*.egg-info/
+*.egg
+
+# Environment
+.env
+.venv
 venv/
-=======
-./data/train/
-./data/test/
->>>>>>> 0f05775665d6ac531ffb372a674d51b231ac95fa
-data/
+
+# pytest
+.pytest_cache/
+
+# Project specific
+data/train/
+data/test/
