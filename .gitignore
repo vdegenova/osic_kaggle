@@ -1,6 +1,7 @@
 # Local caches
 .ipynb_checkpoints/
 __pycache__/
+.DS_Store
 
 # Distribution / packaging
 .Python
@@ -27,3 +28,4 @@ venv/
 # Project specific
 data/train/
 data/test/
+data/.DS_Store
