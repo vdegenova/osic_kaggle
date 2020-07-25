@@ -105,7 +105,7 @@ def train_model(model, training_data, val_data, save_model=False, suffix=None, n
             suffix = datetime.datetime.now()
         else:
             suffix += "-{}".format(datetime.datetime.now())
-        model.save('./autoencoder_model_{}'.format(x))
+        model.save('./autoencoder_model_{}'.format(datetime.datetime.now()))
 
 ##############################################################
 ################ function for encoding patients ##############
