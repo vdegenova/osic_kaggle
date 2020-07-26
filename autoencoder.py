@@ -9,6 +9,8 @@ from tensorflow.keras.layers import Input
 from tensorflow.keras.layers import Conv3D
 from tensorflow.keras.layers import MaxPooling3D
 from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Flatten
+from tensorflow.keras.layers import Reshape
 from tensorflow.keras.models import Model
 from keras.callbacks import TensorBoard
 
@@ -28,11 +30,52 @@ def merge_dicts(dict1, dict2):
 ############################################################
 ############### first let's define the model ###############
 ############################################################
-def create_autoencoder():
+def create_experimental_autoencoder(img_px_size=64, slice_count=8):
     tf.keras.backend.set_image_data_format('channels_last')
 
-    IMG_PX_SIZE = 32
-    SLICE_COUNT = 8
+    IMG_PX_SIZE = img_px_size
+    SLICE_COUNT = slice_count
+
+    input_shape = (IMG_PX_SIZE, IMG_PX_SIZE, SLICE_COUNT, 1)
+    input_img = Input(shape=input_shape)
+
+    # encoder portion
+    x = Conv3D(50, (5, 5, 5), activation='relu', padding="same")(input_img)
+    x = MaxPooling3D((2, 2, 2), padding="same")(x)
+    x = Conv3D(50, (3, 3, 3), activation='relu', padding="same")(x)
+    x = MaxPooling3D((2, 2, 2), padding="same")(x)
+    x = Conv3D(50, (3, 3, 3), activation='relu', padding="same")(x)
+    x = MaxPooling3D((2, 2, 2), padding="same")(x)
+    print(x.shape)
+    x = Flatten()(x)
+    print(x.shape)
+    encoded = Dense(500, activation="relu")(x)
+    # at this point the representation is compressed to 500 dims
+
+    # decoder portion
+    x = Dense(3200, activation="relu")(encoded)
+    x = Reshape((8, 8, 1, 50))(x)
+    x = Conv3D(50, (3, 3, 3), activation='relu', padding="same")(x)
+    x = UpSampling3D((2, 2, 2))(x)
+    x = Conv3D(50, (3, 3, 3), activation='relu', padding="same")(x)
+    x = UpSampling3D((2, 2, 2))(x)
+    x = Conv3D(50, (5, 5, 5), activation='relu', padding="same")(x)
+    x = UpSampling3D((2, 2, 2))(x)
+    decoded = Conv3D(1, (3, 3, 3), activation='sigmoid', padding="same")(x)
+
+    autoencoder = Model(input_img, decoded)
+    autoencoder.compile(optimizer='adam', loss='binary_crossentropy')
+    encoder = Model(input_img, encoded)
+
+    autoencoder.summary()
+
+    return autoencoder, encoder
+
+def create_autoencoder(img_px_size=32, slice_count=8):
+    tf.keras.backend.set_image_data_format('channels_last')
+
+    IMG_PX_SIZE = img_px_size
+    SLICE_COUNT = slice_count
 
     input_shape = (IMG_PX_SIZE, IMG_PX_SIZE, SLICE_COUNT, 1)
     input_img = Input(shape=input_shape)
@@ -63,8 +106,8 @@ def create_autoencoder():
 ###############################################################
 ############### now lets grab the training data ###############
 ###############################################################
-def get_training__and_validation_data_and_patients():
-    all_data = np.load('allthedata-condensed-with_ids-32-32-8.npy', allow_pickle=True)
+def get_training__and_validation_data_and_patients(filename="allthedata-condensed-with_ids-32-32-8.npy"):
+    all_data = np.load(filename, allow_pickle=True)
     np.random.shuffle(all_data)
 
     train_data = all_data[:-50]
@@ -92,11 +135,11 @@ def train_model(model, training_data, val_data, save_model=False, suffix=None, n
     print('Min: %.3f, Max: %.3f' % (training_data.min(), training_data.max()))
     print('Min: %.3f, Max: %.3f' % (val_data.min(), val_data.max()))
 
-    opt = tf.keras.optimizers.Adam(learning_rate=1e-3)
+    opt = tf.keras.optimizers.Adam(learning_rate=1e-4)
     model.compile(optimizer=opt, loss='binary_crossentropy')
     model.fit(training_data, training_data,
                     epochs=n_epochs,
-                    batch_size=128,
+                    batch_size=32,
                     shuffle=True,
                     validation_data=(val_data, val_data),
                     callbacks=[TensorBoard(log_dir='/tmp/autoencoder')])
@@ -125,9 +168,9 @@ def main():
     if os.path.exists('/tmp/autoencoder'):
         shutil.rmtree('/tmp/autoencoder')
 
-    autoencoder, encoder = create_autoencoder()
-    training_data, val_data, training_patients, val_patients = get_training__and_validation_data_and_patients()
-    train_model(autoencoder, training_data, val_data)
+    autoencoder, encoder = create_experimental_autoencoder()
+    training_data, val_data, training_patients, val_patients = get_training__and_validation_data_and_patients("171-images-with_ids-64-64-8.npy")
+    train_model(autoencoder, training_data, val_data, n_epochs=60, save_model=True)
     encoded_training_patients = encode_patients(training_patients, training_data, encoder)
     encoded_val_patients = encode_patients(val_patients, val_data, encoder)
     
@@ -138,7 +181,7 @@ def main():
     print("Saving to {}.pkl".format(encoding_filepath))
 
     with open(encoding_filepath + '.pkl', 'wb') as f:
-            pickle.dump(all_encoded_patients, f, pickle.HIGHEST_PROTOCOL)
+        pickle.dump(all_encoded_patients, f, pickle.HIGHEST_PROTOCOL)
 
 
 
