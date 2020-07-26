@@ -31,6 +31,9 @@ def merge_dicts(dict1, dict2):
 ############### first let's define the model ###############
 ############################################################
 def create_experimental_autoencoder(img_px_size=64, slice_count=8):
+    """
+    this model assumes (64, 64, 8) is the dimensionality of the 3D input
+    """
     tf.keras.backend.set_image_data_format('channels_last')
 
     IMG_PX_SIZE = img_px_size
@@ -46,9 +49,7 @@ def create_experimental_autoencoder(img_px_size=64, slice_count=8):
     x = MaxPooling3D((2, 2, 2), padding="same")(x)
     x = Conv3D(50, (3, 3, 3), activation='relu', padding="same")(x)
     x = MaxPooling3D((2, 2, 2), padding="same")(x)
-    print(x.shape)
     x = Flatten()(x)
-    print(x.shape)
     encoded = Dense(500, activation="relu")(x)
     # at this point the representation is compressed to 500 dims
 
@@ -72,6 +73,9 @@ def create_experimental_autoencoder(img_px_size=64, slice_count=8):
     return autoencoder, encoder
 
 def create_autoencoder(img_px_size=32, slice_count=8):
+    """
+    this model assumes (32, 32, 8) is the dimensionality of the 3D input
+    """
     tf.keras.backend.set_image_data_format('channels_last')
 
     IMG_PX_SIZE = img_px_size
