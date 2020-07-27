@@ -22,6 +22,7 @@ wheels/
 .venv
 venv/
 .vscode/
+.osic-kaggle/
 
 # pytest
 .pytest_cache/
