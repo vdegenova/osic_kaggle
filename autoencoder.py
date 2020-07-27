@@ -110,7 +110,7 @@ def create_autoencoder(img_px_size=32, slice_count=8):
 ###############################################################
 ############### now lets grab the training data ###############
 ###############################################################
-def get_training__and_validation_data_and_patients(filename="allthedata-condensed-with_ids-32-32-8.npy"):
+def get_training__and_validation_data_and_patients(filename="./data/processed_data/allthedata-condensed-with_ids-32-32-8.npy"):
     all_data = np.load(filename, allow_pickle=True)
     np.random.shuffle(all_data)
 
@@ -167,13 +167,13 @@ def encode_patients(patient_ids, patient_images, model):
     return patient_to_encoding_dict
 
 def main():
-    encoding_filepath = './patient_ids_to_encodings_dict'
+    encoding_filepath = './data/processed_data/patient_ids_to_encodings_dict'
     # removing the directory for TensorBoard logs if it already exists
     if os.path.exists('/tmp/autoencoder'):
         shutil.rmtree('/tmp/autoencoder')
 
     autoencoder, encoder = create_experimental_autoencoder()
-    training_data, val_data, training_patients, val_patients = get_training__and_validation_data_and_patients("171-images-with_ids-64-64-8.npy")
+    training_data, val_data, training_patients, val_patients = get_training__and_validation_data_and_patients("./data/processed_data/171-images-with_ids-64-64-8.npy")
     train_model(autoencoder, training_data, val_data, n_epochs=60, save_model=True)
     encoded_training_patients = encode_patients(training_patients, training_data, encoder)
     encoded_val_patients = encode_patients(val_patients, val_data, encoder)

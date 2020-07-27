@@ -102,8 +102,8 @@ def read_in_data(data_dir="./data/train/", img_px_size=32, slice_count=8):
     return np.array(all_the_data, dtype=object)
 
 def save_to_disk(data, img_px_size=32, slice_count=8):
-    print("saving to ./images-with_ids-{}-{}-{}.npy".format(img_px_size, img_px_size, slice_count))
-    np.save("{}-images-with_ids-{}-{}-{}".format(data.shape[0], img_px_size, img_px_size, slice_count), data)
+    print("saving to ./data/processed_data/images-with_ids-{}-{}-{}.npy".format(img_px_size, img_px_size, slice_count))
+    np.save("./data/processed_data/{}-images-with_ids-{}-{}-{}".format(data.shape[0], img_px_size, img_px_size, slice_count), data)
 
 def main():
     patient_data = read_in_data(data_dir="./data/train/", img_px_size=64, slice_count=8)
