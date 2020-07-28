@@ -18,19 +18,35 @@ def mean(l):
 
 
 def process_data(patient, patient_history_df, img_px_size=32, hm_slices=8, visualize=False, data_dir="./data/train/"):
+    '''
+    Function to read in all of the DICOMS in a patient dir, condense arrays into aggregated chunks
+    INPUTS:
+        patient (str): Patient ID. data_dir/<patient>/ contains DICOMS
+        patient_history_df (pd.DataFrame): dataframe of tabular data associated with this patient
+        img_px_size (int): resize source DICOM image array to square matrix of this shape
+        hm_slices (int): number of chunks to output
+    RETURNS:
+        img_data (np.Array): (hm_slices, img_px_size, img_px_size) array for one patient
+        patient_history (pd.DataFrame): Patient tabular data, filtered to critical columns
+    '''
+
     path = data_dir + patient
     slices = [pydicom.read_file(path + '/' + s) for s in os.listdir(path)]
-    slices.sort(key = lambda x: int(x.ImagePositionPatient[2]))
+    slices.sort(key = lambda x: int(x.ImagePositionPatient[2])) # sorts DICOMS by caudial (ass) to cranial (head)
     
     # each scan is not the same depth (number of slices), we we group the slices into chunks of size HM_SLICES
     # and average across them to make sure the dimensionality is standardized
     
     new_slices = []
     
+    # resize each pixel array - slices changed type to array here. Start as 512 x 512
     slices = [resize(np.array(each_slice.pixel_array), (img_px_size, img_px_size)) for each_slice in slices]
+
+    #TODO: normalize slices to HU scale
     
     chunk_sizes = math.ceil(len(slices) / hm_slices)
     
+    # broadcast mean() elementwise across each chunk of size chunk_sizes
     for slice_chunk in chunks(slices, chunk_sizes):
         slice_chunk = list(map(mean, zip(*slice_chunk)))
         new_slices.append(slice_chunk)
@@ -76,8 +92,18 @@ def process_data(patient, patient_history_df, img_px_size=32, hm_slices=8, visua
     return np.array(new_slices), relevant_side_info
 
 def read_in_data(data_dir="./data/train/", img_px_size=32, slice_count=8):
-    patients = os.listdir(data_dir)
-    train_df = pd.read_csv("./data/train.csv")
+    '''
+    Function to ___
+    INPUTS:
+        data_dir (str): folder location of training DICOMS patient folders
+        img_px_size (int): resize source DICOM image array to square matrix of this shape
+        hm_slices (int): number of chunks to condense each patient DICOMs into
+    RETURNS:
+        all_the_data (np.array): array of size (n_patients, 2), where each entry is [DICOM_reshape_array, patient_id]
+    '''
+
+    patients = os.listdir(data_dir) # list of training patient IDS (folders which contain DICOMS)
+    train_df = pd.read_csv("./data/train.csv") # list of training patient tabular data
 
     IMG_PX_SIZE = img_px_size
     SLICE_COUNT = slice_count
