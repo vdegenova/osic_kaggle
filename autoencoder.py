@@ -12,7 +12,7 @@ from tensorflow.keras.layers import Dense
 from tensorflow.keras.layers import Flatten
 from tensorflow.keras.layers import Reshape
 from tensorflow.keras.models import Model
-from keras.callbacks import TensorBoard
+from tensorflow.keras.callbacks import TensorBoard
 
 ############################################################
 ##################### helper functions #####################
