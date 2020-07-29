@@ -51,19 +51,16 @@ def process_data(patient, patient_history_df, img_px_size=32, hm_slices=8, visua
 
     path = data_dir + patient
     dicoms = [pydicom.read_file(path + '/' + s) for s in os.listdir(path)]
-    dicoms.sort(key = lambda x: int(x.ImagePositionPatient[2])) # sorts DICOMS by caudial (ass) to cranial (head)
-    
+    dicoms.sort(key=lambda x: int(x.ImagePositionPatient[2])) # sorts DICOMS by caudial (ass) to cranial (head)
+
     # each scan is not the same depth (number of slices), we we group the slices into chunks of size HM_SLICES
     # and average across them to make sure the dimensionality is standardized
-    
-    new_slices = []
-
     # get pixel arrays for each dicom, HU rescale at the same time
     slices = [hu_scaled_px(dicom.pixel_array,
                            dicom.Modality,
                            dicom.RescaleSlope,
                            dicom.RescaleIntercept) for dicom in dicoms]
-    
+
     # resize each pixel array - slices changed type to array here. Start as 512 x 512
     slices = [resize(np.array(each_slice), (img_px_size, img_px_size)) for each_slice in slices]
 
@@ -83,7 +80,7 @@ def process_data(patient, patient_history_df, img_px_size=32, hm_slices=8, visua
         # INTER_LANCZOS4 – a Lanczos interpolation over 8×8 pixel neighborhood
 
     relevant_side_info = patient_history_df[["Patient", "Weeks", "FVC", "Percent"]]
-    
+
     return chunked_slices, relevant_side_info
 
 def read_in_data(data_dir="./data/train/", img_px_size=32, slice_count=8):
@@ -110,12 +107,12 @@ def read_in_data(data_dir="./data/train/", img_px_size=32, slice_count=8):
         if num%10 == 0:
             print("Patient:" + str(num))
         patient_history_df = train_df[train_df.Patient == patient].sort_values(by="Weeks")
-        
+
         try:
             img_data, patient_history = process_data(patient, patient_history_df, img_px_size=IMG_PX_SIZE, hm_slices=SLICE_COUNT)
             patient_id = patient_history.Patient.iloc[0]
             all_the_data.append([img_data, patient_id])
-                        
+
         except Exception as e:
             print(patient, e)
             error_log.append((patient, e))
