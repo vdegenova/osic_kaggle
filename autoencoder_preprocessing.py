@@ -1,10 +1,11 @@
-import pydicom          # for reading dicom files
-import os               # do directory ops
-import pandas as pd     # data analysis
-import numpy as np      # array ops
-import math             # used for ceil ops
-from cv2 import resize  # image processing
-import matplotlib.pyplot as plt
+import os                           # do directory ops
+import math                         # used for ceil ops
+import datetime                     # used for saving with a datetime string
+import pandas as pd                 # data analysis
+import numpy as np                  # array ops
+import matplotlib.pyplot as plt     # used for visualization in dev
+import pydicom                      # for reading dicom files
+from cv2 import resize              # image processing
 
 def chunks(lst, n):
     # source link: https://stackoverflow.com/questions/312443/how-do-you-split-a-list-into-evenly-sized-chunks
