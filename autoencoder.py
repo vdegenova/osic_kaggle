@@ -12,7 +12,7 @@ from tensorflow.keras.layers import Dense
 from tensorflow.keras.layers import Flatten
 from tensorflow.keras.layers import Reshape
 from tensorflow.keras.models import Model
-from tensorflow.keras.callbacks import TensorBoard
+from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
 
 ############################################################
 ##################### helper functions #####################
@@ -141,18 +141,28 @@ def train_model(model, training_data, val_data, save_model=False, suffix=None, n
 
     opt = tf.keras.optimizers.Adam(learning_rate=1e-4)
     model.compile(optimizer=opt, loss='binary_crossentropy')
+
+    model_checkpoint_callback = ModelCheckpoint(
+        filepath=f'./autoencoder_model_{"" if suffix is None else suffix}_{datetime.datetime.now()}',
+        monitor='val_loss',
+        save_best_only=True
+    )
+    tensorboard_callback = TensorBoard(
+        log_dir='/tmp/autoencoder'
+    )
+
     model.fit(training_data, training_data,
                     epochs=n_epochs,
                     batch_size=32,
                     shuffle=True,
                     validation_data=(val_data, val_data),
-                    callbacks=[TensorBoard(log_dir='/tmp/autoencoder')])
-    if save_model:
-        if not suffix:
-            suffix = datetime.datetime.now()
-        else:
-            suffix += "-{}".format(datetime.datetime.now())
-        model.save('./autoencoder_model_{}'.format(datetime.datetime.now()))
+                    callbacks=[tensorboard_callback, model_checkpoint_callback])
+    # if save_model:
+    #     if not suffix:
+    #         suffix = datetime.datetime.now()
+    #     else:
+    #         suffix += "-{}".format(datetime.datetime.now())
+    #     model.save('./autoencoder_model_{}'.format(datetime.datetime.now()))
 
 ##############################################################
 ################ function for encoding patients ##############
