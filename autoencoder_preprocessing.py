@@ -17,6 +17,24 @@ def mean(l):
     return sum(l)/len(l)
 
 
+def hu_scaled_px(img, modality, rescale_slope, rescale_intercept):
+    '''
+    rescales array based on input parameters to fit HU scale (https://en.wikipedia.org/wiki/Hounsfield_scale)
+    Air: -1000
+    Water: 0
+    Bone: 300-3000
+    Metal: 2000
+    INPUTS:
+        img (np.array) array to be rescaled (dicom.pixel_array)
+        modality (str): dicom attribute, modality
+        rescale_slope (float): rescale slope (dicom.RescaleSlope)
+        rescale_intercept (float): rescale slope (dicom.RescaleIntercept)
+    RETRUNS:
+        (np.array) scaled array
+    '''
+    return img if modality == "CR" else img * rescale_slope + rescale_intercept
+
+
 def process_data(patient, patient_history_df, img_px_size=32, hm_slices=8, visualize=False, data_dir="./data/train/"):
     '''
     Function to read in all of the DICOMS in a patient dir, condense arrays into aggregated chunks
@@ -31,65 +49,41 @@ def process_data(patient, patient_history_df, img_px_size=32, hm_slices=8, visua
     '''
 
     path = data_dir + patient
-    slices = [pydicom.read_file(path + '/' + s) for s in os.listdir(path)]
-    slices.sort(key = lambda x: int(x.ImagePositionPatient[2])) # sorts DICOMS by caudial (ass) to cranial (head)
+    dicoms = [pydicom.read_file(path + '/' + s) for s in os.listdir(path)]
+    dicoms.sort(key = lambda x: int(x.ImagePositionPatient[2])) # sorts DICOMS by caudial (ass) to cranial (head)
     
     # each scan is not the same depth (number of slices), we we group the slices into chunks of size HM_SLICES
     # and average across them to make sure the dimensionality is standardized
     
     new_slices = []
+
+    # get pixel arrays for each dicom, HU rescale at the same time
+    slices = [hu_scaled_px(dicom.pixel_array,
+                           dicom.Modality,
+                           dicom.RescaleSlope,
+                           dicom.RescaleIntercept) for dicom in dicoms]
     
     # resize each pixel array - slices changed type to array here. Start as 512 x 512
-    slices = [resize(np.array(each_slice.pixel_array), (img_px_size, img_px_size)) for each_slice in slices]
+    slices = [resize(np.array(each_slice), (img_px_size, img_px_size)) for each_slice in slices]
 
-    #TODO: normalize slices to HU scale
-    
-    chunk_sizes = math.ceil(len(slices) / hm_slices)
-    
-    # broadcast mean() elementwise across each chunk of size chunk_sizes
-    for slice_chunk in chunks(slices, chunk_sizes):
-        slice_chunk = list(map(mean, zip(*slice_chunk)))
-        new_slices.append(slice_chunk)
-    
-    # accounting for rounding errors by averaging the last slice or two if necessary
-    if len(new_slices) == hm_slices - 1:
-        new_slices.append(new_slices[-1])
-    
-    if len(new_slices) == hm_slices - 2:
-        new_slices.append(new_slices[-1])
-        new_slices.append(new_slices[-1])
-    
-    if len(new_slices) == hm_slices - 3:
-        new_slices.append(new_slices[-1])
-        new_slices.append(new_slices[-1])
-        new_slices.append(new_slices[-1])
-    
-    if len(new_slices) == hm_slices - 4:
-        new_slices.append(new_slices[-1])
-        new_slices.append(new_slices[-1])
-        new_slices.append(new_slices[-1])
-        new_slices.append(new_slices[-1])
-        
-    if len(new_slices) == hm_slices + 2:
-        new_val = list(map(mean, zip(*[new_slices[hm_slices-1], new_slices[hm_slices]])))
-        del new_slices[hm_slices]
-        new_slices[hm_slices-1] = new_val
-    
-    if len(new_slices) == hm_slices + 2:
-        new_val = list(map(mean, zip(*[new_slices[hm_slices-1], new_slices[hm_slices]])))
-        del new_slices[hm_slices]
-        new_slices[hm_slices-1] = new_val    
-    
-    if visualize:
-        fig = plt.figure()
-        for num, each_slice in enumerate(new_slices):
-            y = fig.add_subplot(2, 5, num+1)
-            y.imshow(each_slice, cmap="gray")
-        plt.show()
-    
+    # try opencv.resize on a different axis
+    slices = np.array(slices)
+    # initialze resized array, then modify each slice along second axis
+    chunked_slices = np.zeros(shape=(hm_slices, img_px_size, img_px_size)) # (8, 64, 64)
+    for i in range(chunked_slices.shape[1]):
+        chunked_slices[:,i,:] = resize(slices[:,i,:], (img_px_size, hm_slices))
+        # interpolation methods are: (https://www.tutorialkart.com/opencv/python/opencv-python-resize-image/)
+        # INTER_NEAREST – a nearest-neighbor interpolation
+        # INTER_LINEAR – a bilinear interpolation (used by default)
+        # INTER_AREA – resampling using pixel area relation.
+        #   It may be a preferred method for image decimation, as it gives moire’-free results.
+        #   But when the image is zoomed, it is similar to the INTER_NEAREST method. 
+        # INTER_CUBIC – a bicubic interpolation over 4×4 pixel neighborhood
+        # INTER_LANCZOS4 – a Lanczos interpolation over 8×8 pixel neighborhood
+
     relevant_side_info = patient_history_df[["Patient", "Weeks", "FVC", "Percent"]]
     
-    return np.array(new_slices), relevant_side_info
+    return chunked_slices, relevant_side_info
 
 def read_in_data(data_dir="./data/train/", img_px_size=32, slice_count=8):
     '''
@@ -122,14 +116,16 @@ def read_in_data(data_dir="./data/train/", img_px_size=32, slice_count=8):
             all_the_data.append([img_data, patient_id])
                         
         except Exception as e:
+            print(patient, e)
             error_log.append((patient, e))
             continue
     
     return np.array(all_the_data, dtype=object)
 
 def save_to_disk(data, img_px_size=32, slice_count=8):
-    print("saving to ./data/processed_data/images-with_ids-{}-{}-{}.npy".format(img_px_size, img_px_size, slice_count))
-    np.save("./data/processed_data/{}-images-with_ids-{}-{}-{}".format(data.shape[0], img_px_size, img_px_size, slice_count), data)
+    filestring = f'./data/processed_data/{data.shape[0]}-images-with_ids-{img_px_size}-{img_px_size}-{slice_count}-{datetime.datetime.now()}.npy'
+    print(f'saving to {filestring}')
+    np.save(filestring, data)
 
 def main():
     patient_data = read_in_data(data_dir="./data/train/", img_px_size=64, slice_count=8)
