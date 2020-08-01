@@ -11,6 +11,7 @@ from tensorflow.keras.layers import Reshape
 from tensorflow.keras.layers import Dropout
 from tensorflow.keras.models import Model
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
+from sklearn.model_selection import train_test_split
 
 ############################################################
 ##################### helper functions #####################
@@ -96,25 +97,38 @@ def encode_patients(patient_ids, patient_images, model):
     return patient_to_encoding_dict
 
 def main():
-    encoding_filepath = './data/processed_data/patient_ids_to_encodings_dict'
+
     # removing the directory for TensorBoard logs if it already exists
     if os.path.exists('/tmp/regressor'):
         shutil.rmtree('/tmp/regressor')
 
-    regressor = create_dense_regressor()
-    training_data, val_data, training_patients, val_patients = get_training__and_validation_data_and_patients("./data/processed_data/171-images-with_ids-64-64-8-2020-07-31 15:17:13.995120.npy")
-    train_model(autoencoder, training_data, val_data, n_epochs=120)
-    encoded_training_patients = encode_patients(training_patients, training_data, encoder)
-    encoded_val_patients = encode_patients(val_patients, val_data, encoder)
-    
-    all_encoded_patients = merge_dicts(encoded_training_patients, encoded_val_patients)
-    
-    encoding_filepath += "-{}".format(datetime.datetime.now())
-    print("{} Patients encoded.".format(len(all_encoded_patients)))
-    print("Saving to {}.pkl".format(encoding_filepath))
+    # pass embedding + csv filepaths to function to unify into one dataframe
+    embeddings_path = './data/processed_data/patient_ids_to_encodings_dict-2020-07-31 17:09:25.371193.pkl'
+    tabular_path = './data/train_csv'
+    all_data = ...
 
-    with open(encoding_filepath + '.pkl', 'wb') as f:
-        pickle.dump(all_encoded_patients, f, pickle.HIGHEST_PROTOCOL)
+    # get, run pipeline
+    pipeline = ...
+    X, y = pipeline.fit_transform(all_data)
+
+    # test train split
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=49)
+
+    # Create regressor
+    regressor = create_dense_regressor(n_input_dims = X_train.shape[1])
+
+    # train model
+    train_model(regressor, training_data, val_data, n_epochs=120)
+
+    # encoded_training_patients = encode_patients(training_patients, training_data, encoder)
+    # encoded_val_patients = encode_patients(val_patients, val_data, encoder)
+    # all_encoded_patients = merge_dicts(encoded_training_patients, encoded_val_patients)
+    # encoding_filepath += "-{}".format(datetime.datetime.now())
+    # print("{} Patients encoded.".format(len(all_encoded_patients)))
+    # print("Saving to {}.pkl".format(encoding_filepath))
+
+    # with open(encoding_filepath + '.pkl', 'wb') as f:
+    #     pickle.dump(all_encoded_patients, f, pickle.HIGHEST_PROTOCOL)
 
 
 

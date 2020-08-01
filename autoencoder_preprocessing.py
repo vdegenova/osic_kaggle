@@ -129,8 +129,10 @@ def save_to_disk(data, img_px_size=32, slice_count=8):
     np.save(filestring, data)
 
 def main():
-    patient_data = read_in_data(data_dir="./data/train/", img_px_size=64, slice_count=8)
-    save_to_disk(patient_data, img_px_size=64, slice_count=8)
+    img_px_size = 128
+    slice_count = 8
+    patient_data = read_in_data(data_dir="./data/train/", img_px_size=img_px_size, slice_count=slice_count)
+    save_to_disk(patient_data, img_px_size=img_px_size, slice_count=slice_count)
 
 if __name__ == "__main__":
     main()
