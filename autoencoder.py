@@ -18,6 +18,7 @@ from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
 ##################### helper functions #####################
 ############################################################
 def normalize(data):
+    # TODO: swap with RobustScaler
     data_min = data.min()
     data_max = data.max()
     data = [(x-data_min) / (data_max - data_min) for x in data]
@@ -133,7 +134,7 @@ def get_training__and_validation_data_and_patients(filename="./data/processed_da
 ###########################################
 ################ lets train ###############
 ###########################################
-def train_model(model, training_data, val_data, save_model=False, suffix=None, n_epochs=10):
+def train_model(model, training_data, val_data, suffix=None, n_epochs=10):
     print("Training data shape: {}".format(training_data.shape))
     print("Validation data shape: {}".format(val_data.shape))
     print('Min: %.3f, Max: %.3f' % (training_data.min(), training_data.max()))
@@ -157,12 +158,6 @@ def train_model(model, training_data, val_data, save_model=False, suffix=None, n
                     shuffle=True,
                     validation_data=(val_data, val_data),
                     callbacks=[tensorboard_callback, model_checkpoint_callback])
-    # if save_model:
-    #     if not suffix:
-    #         suffix = datetime.datetime.now()
-    #     else:
-    #         suffix += "-{}".format(datetime.datetime.now())
-    #     model.save('./autoencoder_model_{}'.format(datetime.datetime.now()))
 
 ##############################################################
 ################ function for encoding patients ##############
@@ -182,14 +177,21 @@ def main():
     if os.path.exists('/tmp/autoencoder'):
         shutil.rmtree('/tmp/autoencoder')
 
+    # Create model architecture
     autoencoder, encoder = create_experimental_autoencoder()
-    training_data, val_data, training_patients, val_patients = get_training__and_validation_data_and_patients("./data/processed_data/171-images-with_ids-64-64-8.npy")
-    train_model(autoencoder, training_data, val_data, n_epochs=60, save_model=True)
+
+    # Load training + validation data from preprocessed .npy
+    training_data, val_data, training_patients, val_patients = get_training__and_validation_data_and_patients("./data/processed_data/171-images-with_ids-64-64-8-2020-07-31 15:17:13.995120.npy")
+    
+    # Train model
+    train_model(autoencoder, training_data, val_data, n_epochs=120)
+
+    # Record final embedding for each patient {PatientID: flatten(embeddings)}
     encoded_training_patients = encode_patients(training_patients, training_data, encoder)
     encoded_val_patients = encode_patients(val_patients, val_data, encoder)
-    
     all_encoded_patients = merge_dicts(encoded_training_patients, encoded_val_patients)
     
+    # Save embeddings as pkl of dictionary
     encoding_filepath += "-{}".format(datetime.datetime.now())
     print("{} Patients encoded.".format(len(all_encoded_patients)))
     print("Saving to {}.pkl".format(encoding_filepath))
