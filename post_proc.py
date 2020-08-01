@@ -22,12 +22,14 @@ class DataFrameSelector(BaseEstimator, TransformerMixin):
         # X must be a pd.DataFrame
         return X[self.attr]
 
-def load_pickled_encodings(pickle_path, data_frame, key="Patient"):
+def load_pickled_encodings(pickle_path, csv_path, key="Patient"):
     """Loads pickled CT encodings and joins them df on 'key'"""
     with open(pickle_path, "rb") as fio:
         patient_ct_encodings = pickle.load(fio)
     # Load the dict with keys as rows & values as columns
     patient_ct_encodings = pd.DataFrame.from_dict(patient_ct_encodings, orient="index")
+    # Load the csv dataframe
+    data_frame = pd.read_csv(csv_path)
     # Left join to data_frame on key
     return data_frame.join(patient_ct_encodings, on=key, how="left")
 

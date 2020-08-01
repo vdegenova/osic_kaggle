@@ -13,6 +13,9 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
 from sklearn.model_selection import train_test_split
 
+# custom modules
+from post_proc import get_pipeline_selectors, get_postproc_pipeline, load_pickled_encodings
+
 ############################################################
 ##################### helper functions #####################
 ############################################################
@@ -59,30 +62,31 @@ def create_dense_regressor(n_input_dims):
 ###########################################
 ################ lets train ###############
 ###########################################
-def train_model(model, training_data, val_data, suffix=None, n_epochs=10):
-    print("Training data shape: {}".format(training_data.shape))
-    print("Validation data shape: {}".format(val_data.shape))
-    print('Min: %.3f, Max: %.3f' % (training_data.min(), training_data.max()))
-    print('Min: %.3f, Max: %.3f' % (val_data.min(), val_data.max()))
+def train_model(model, X, y, validation_split, suffix=None, n_epochs=10):
+    # print("Training data shape: {}".format(training_data.shape))
+    # print("Validation data shape: {}".format(val_data.shape))
+    # print('Min: %.3f, Max: %.3f' % (training_data.min(), training_data.max()))
+    # print('Min: %.3f, Max: %.3f' % (val_data.min(), val_data.max()))
 
-    opt = tf.keras.optimizers.Adam(learning_rate=1e-4)
-    model.compile(optimizer=opt, loss='binary_crossentropy')
+    # model was already compiled with Adam in create_()????
+    # opt = tf.keras.optimizers.Adam(learning_rate=1e-4)
+    # model.compile(optimizer=opt, loss='binary_crossentropy')
 
     model_checkpoint_callback = ModelCheckpoint(
-        filepath=f'./autoencoder_model_{"" if suffix is None else suffix}_{datetime.datetime.now()}',
+        filepath=f'./regressor_model_{"" if suffix is None else suffix}_{datetime.datetime.now()}',
         monitor='val_loss',
         save_best_only=True
     )
     tensorboard_callback = TensorBoard(
-        log_dir='/tmp/autoencoder'
+        log_dir='/tmp/regressor'
     )
 
-    model.fit(training_data, training_data,
-                    epochs=n_epochs,
-                    batch_size=32,
-                    shuffle=True,
-                    validation_data=(val_data, val_data),
-                    callbacks=[tensorboard_callback, model_checkpoint_callback])
+    model.fit(X, y,
+        epochs=n_epochs,
+        batch_size=32,
+        shuffle=True,
+        validation_split=validation_split,
+        callbacks=[tensorboard_callback, model_checkpoint_callback])
 
 ##############################################################
 ################ function for encoding patients ##############
@@ -104,21 +108,21 @@ def main():
 
     # pass embedding + csv filepaths to function to unify into one dataframe
     embeddings_path = './data/processed_data/patient_ids_to_encodings_dict-2020-07-31 17:09:25.371193.pkl'
-    tabular_path = './data/train_csv'
-    all_data = ...
+    csv_path = './data/train.csv'
+    all_data = load_pickled_encodings(embeddings_path, csv_path)
+    X = all_data.drop(columns = 'FVC') # keep as a dataframe to pass to pipeline
+    y = np.array(all_data['FVC'].values)
 
     # get, run pipeline
-    pipeline = ...
-    X, y = pipeline.fit_transform(all_data)
-
-    # test train split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=49)
+    no_op_attrs, num_attrs, cat_attrs, encoded_attrs = get_pipeline_selectors()
+    pipeline = get_postproc_pipeline(no_op_attrs, num_attrs, cat_attrs, encoded_attrs)
+    X = pipeline.fit_transform(X).toarray() # returns scipy.sparse.csr.csr_matrix by default
 
     # Create regressor
-    regressor = create_dense_regressor(n_input_dims = X_train.shape[1])
+    regressor = create_dense_regressor(n_input_dims = X.shape[1])
 
     # train model
-    train_model(regressor, training_data, val_data, n_epochs=120)
+    train_model(regressor, X, y, validation_split=.2, n_epochs=120)
 
     # encoded_training_patients = encode_patients(training_patients, training_data, encoder)
     # encoded_val_patients = encode_patients(val_patients, val_data, encoder)
