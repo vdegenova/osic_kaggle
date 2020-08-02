@@ -112,7 +112,7 @@ def main():
     csv_path = './data/train.csv'
     all_data = load_pickled_encodings(embeddings_path, csv_path)
     X = all_data.drop(columns = 'FVC') # keep as a dataframe to pass to pipeline
-    y = np.array(all_data['FVC'].values)
+    y = all_data[['FVC']]
 
     # get, run pipeline
     no_op_attrs, num_attrs, cat_attrs, encoded_attrs = get_pipeline_selectors()
@@ -123,7 +123,7 @@ def main():
     regressor = create_dense_regressor(n_input_dims = X.shape[1])
 
     # train model
-    train_model(regressor, X, y, validation_split=.2, n_epochs=1000)
+    train_model(regressor, X, y, validation_split=.3, n_epochs=1000)
 
     # encoded_training_patients = encode_patients(training_patients, training_data, encoder)
     # encoded_val_patients = encode_patients(val_patients, val_data, encoder)

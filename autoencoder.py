@@ -176,12 +176,15 @@ def main():
     # removing the directory for TensorBoard logs if it already exists
     if os.path.exists('/tmp/autoencoder'):
         shutil.rmtree('/tmp/autoencoder')
+        # tensorboard --logdir /tmp/autoencoder
 
     # Create model architecture
     autoencoder, encoder = create_experimental_autoencoder()
 
     # Load training + validation data from preprocessed .npy
-    training_data, val_data, training_patients, val_patients = get_training__and_validation_data_and_patients("./data/processed_data/171-images-with_ids-64-64-8-2020-07-31 15:17:13.995120.npy")
+    # preprocessed_npy = './data/processed_data/171-images-with_ids-64-64-8-2020-07-31 15:17:13.995120.npy'
+    preprocessed_npy = './data/processed_data/171-images-with_ids-64-64-8-2020-08-01 22:38:35.378502.npy'
+    training_data, val_data, training_patients, val_patients = get_training__and_validation_data_and_patients(preprocessed_npy)
     
     # Train model
     train_model(autoencoder, training_data, val_data, n_epochs=120)
