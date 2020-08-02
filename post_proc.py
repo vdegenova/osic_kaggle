@@ -63,7 +63,7 @@ def get_pipeline_selectors():
     # WARN: This is a helper function that must be tweaked by hand on every change
     # No-op weeks because time progress is significant?
     no_op_attrs = ["Weeks"]
-    num_attrs = ["Percent", "Age"]
+    num_attrs = ["Age"]
     cat_attrs = ["Sex", "SmokingStatus"]
     # After the join, the encoded CT columns have integer column labels between 0 & n - 1
     # Where n is the dimensions of the CT bottleneck encoding: n = 500;

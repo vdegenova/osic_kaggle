@@ -45,14 +45,16 @@ def create_dense_regressor(n_input_dims):
     # model arch
     x = Dense(1024, activation='relu',)(input_features)
     x = Dropout(.5)(x)
-    x = Dense(512, activation='relu',)(x)
+    x = Dense(512, activation='relu')(x)
     x = Dropout(.5)(x)
-    x = Dense(256, activation='relu',)(x)
+    x = Dense(256, activation='relu')(x)
+    x = Dropout(.5)(x)
+    x = Dense(128, activation='relu')(x)
     x = Dropout(.5)(x)
     fvc_prediction = Dense(1)(x)
 
     regressor = Model(input_features, fvc_prediction)
-    regressor.compile(optimizer='adam', loss='mse')
+    regressor.compile(optimizer='adam', loss='LogCosh')
 
     regressor.summary()
 
@@ -104,6 +106,7 @@ def main():
 
     # removing the directory for TensorBoard logs if it already exists
     if os.path.exists('/tmp/regressor'):
+        print("Removing existing tensorboard logs")
         shutil.rmtree('/tmp/regressor')
 
     # pass embedding + csv filepaths to function to unify into one dataframe
