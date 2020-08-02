@@ -52,7 +52,7 @@ def create_dense_regressor(n_input_dims):
     fvc_prediction = Dense(1)(x)
 
     regressor = Model(input_features, fvc_prediction)
-    regressor.compile(optimizer='adam', loss='binary_crossentropy')
+    regressor.compile(optimizer='adam', loss='mse')
 
     regressor.summary()
 
@@ -107,7 +107,8 @@ def main():
         shutil.rmtree('/tmp/regressor')
 
     # pass embedding + csv filepaths to function to unify into one dataframe
-    embeddings_path = './data/processed_data/patient_ids_to_encodings_dict-2020-07-31 17:09:25.371193.pkl'
+    #embeddings_path = './data/processed_data/patient_ids_to_encodings_dict-2020-07-31 17:09:25.371193.pkl'
+    embeddings_path = './data/processed_data/patient_ids_to_encodings_dict-2020-07-26 13:50:14.433337.pkl'
     csv_path = './data/train.csv'
     all_data = load_pickled_encodings(embeddings_path, csv_path)
     X = all_data.drop(columns = 'FVC') # keep as a dataframe to pass to pipeline
@@ -122,7 +123,7 @@ def main():
     regressor = create_dense_regressor(n_input_dims = X.shape[1])
 
     # train model
-    train_model(regressor, X, y, validation_split=.2, n_epochs=120)
+    train_model(regressor, X, y, validation_split=.2, n_epochs=1000)
 
     # encoded_training_patients = encode_patients(training_patients, training_data, encoder)
     # encoded_val_patients = encode_patients(val_patients, val_data, encoder)
