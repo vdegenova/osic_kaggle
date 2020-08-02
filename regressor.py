@@ -44,13 +44,13 @@ def create_dense_regressor(n_input_dims):
 
     # model arch
     x = Dense(1024, activation='relu',)(input_features)
-    x = Dropout(.25)(x)
+    x = Dropout(.5)(x)
     x = Dense(512, activation='relu')(x)
-    x = Dropout(.25)(x)
+    x = Dropout(.5)(x)
     x = Dense(256, activation='relu')(x)
-    x = Dropout(.25)(x)
+    x = Dropout(.5)(x)
     x = Dense(128, activation='relu')(x)
-    x = Dropout(.25)(x)
+    x = Dropout(.5)(x)
     fvc_prediction = Dense(1)(x)
 
     regressor = Model(input_features, fvc_prediction)
