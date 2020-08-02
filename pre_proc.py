@@ -107,8 +107,11 @@ def make_lungmask(img, display=False):
         mask = mask + np.where(labels==N,1,0)
     mask = morphology.dilation(mask,np.ones([10,10])) # one last dilation
 
+    # final masked image
+    masked_img = mask*img
+
     if (display):
-        fig, ax = plt.subplots(3, 2, figsize=[8, 12])
+        fig, ax = plt.subplots(3, 2, figsize=[6, 7])
         ax[0, 0].set_title("Original")
         ax[0, 0].imshow(img, cmap='gray')
         ax[0, 0].axis('off')
@@ -125,11 +128,12 @@ def make_lungmask(img, display=False):
         ax[2, 0].imshow(mask, cmap='gray')
         ax[2, 0].axis('off')
         ax[2, 1].set_title("Apply Mask on Original")
-        ax[2, 1].imshow(mask*img, cmap='gray')
+        ax[2, 1].imshow(masked_img, cmap='gray')
         ax[2, 1].axis('off')
-        
+        textstr = f'Final image var: {np.round(np.var(masked_img), 4)}'
+        plt.gcf().text(0.5, 0.01, textstr, fontsize=12, color='red', horizontalalignment='center')
         plt.show()
-    return mask*img
+    return masked_img
 
 def process_data(patient, patient_history_df, img_px_size=32, hm_slices=8, verbose=False, data_dir="./data/train/"):
     '''
@@ -160,7 +164,7 @@ def process_data(patient, patient_history_df, img_px_size=32, hm_slices=8, verbo
     # EXPERIMENTAL: lung masking
     masked_slices = []
     for each_slice in tqdm(slices):
-        masked_slices.append(make_lungmask(each_slice))
+        masked_slices.append(make_lungmask(each_slice, True))
 
     # resize each pixel array - slices changed type to array here. Start as 512 x 512
     masked_slices = [resize(np.array(each_slice), (img_px_size, img_px_size)) for each_slice in slices]
