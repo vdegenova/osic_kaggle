@@ -109,6 +109,8 @@ def make_lungmask(img, display=False):
 
     # final masked image
     masked_img = mask*img
+    masked_img_var = np.round(np.var(masked_img), 4)
+    n_labels = len(good_labels)
 
     if (display):
         fig, ax = plt.subplots(3, 2, figsize=[6, 7])
@@ -130,10 +132,10 @@ def make_lungmask(img, display=False):
         ax[2, 1].set_title("Apply Mask on Original")
         ax[2, 1].imshow(masked_img, cmap='gray')
         ax[2, 1].axis('off')
-        textstr = f'Final image var: {np.round(np.var(masked_img), 4)}'
+        textstr = f'Final image var: {masked_img_var}'
         plt.gcf().text(0.5, 0.01, textstr, fontsize=12, color='red', horizontalalignment='center')
         plt.show()
-    return masked_img
+    return masked_img, masked_img_var, n_labels
 
 def process_data(patient, patient_history_df, img_px_size=32, hm_slices=8, verbose=False, data_dir="./data/train/"):
     '''
@@ -163,8 +165,21 @@ def process_data(patient, patient_history_df, img_px_size=32, hm_slices=8, verbo
 
     # EXPERIMENTAL: lung masking
     masked_slices = []
+    masked_img_var_list = []
+    n_labels_list = []
     for each_slice in tqdm(slices):
-        masked_slices.append(make_lungmask(each_slice, True))
+        masked_img, masked_img_var, n_labels = make_lungmask(each_slice, False)
+        if masked_img_var > 0: # recommending using .05 
+            masked_slices.append(masked_img)
+            masked_img_var_list.append(masked_img_var)
+            n_labels_list.append(n_labels)
+
+    # fig, axes = plt.subplots(6,6,figsize=(12, 12))
+    # for i, img in enumerate(masked_slices):
+    #     axes[i // 6, i % 6].imshow(img)
+    #     axes[i // 6, i % 6].text(.5,.5,f'var: {masked_img_var_list[i]}')
+    #     axes[i // 6, i % 6].axis('off')
+    # plt.show()
 
     # resize each pixel array - slices changed type to array here. Start as 512 x 512
     masked_slices = [resize(np.array(each_slice), (img_px_size, img_px_size)) for each_slice in slices]
