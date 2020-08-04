@@ -4,6 +4,7 @@ import pickle
 import datetime
 import numpy as np
 import tensorflow as tf
+import tensorflow.keras.backend as K
 from tensorflow.keras.layers import Input
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.layers import Flatten
@@ -33,6 +34,11 @@ def merge_dicts(dict1, dict2):
 ############################################################
 ############### first let's define the model ###############
 ############################################################
+def tilted_loss(y, f):
+    q = 0.9 # which quantile are we predicting (0.9 = 90th percentile)
+    e = (y-f)
+    return K.mean(K.maximum(q*e, (q-1)*e), axis=-1)
+
 def create_dense_regressor(n_input_dims):
     """
     Creates and returns model architecture for a dense network with dropout
@@ -54,7 +60,9 @@ def create_dense_regressor(n_input_dims):
     fvc_prediction = Dense(1)(x)
 
     regressor = Model(input_features, fvc_prediction)
-    regressor.compile(optimizer='adam', loss='LogCosh')
+    quantile = 0.9
+    regressor.compile(loss=tilted_loss, optimizer='adam')
+    # regressor.compile(optimizer='adam', loss='LogCosh')
 
     regressor.summary()
 
@@ -126,7 +134,7 @@ def main():
     regressor = create_dense_regressor(n_input_dims = X.shape[1])
 
     # train model
-    train_model(regressor, X, y, validation_split=.3, n_epochs=1000)
+    train_model(regressor, X, y, validation_split=.3, n_epochs=100, suffix='quantile_90')
 
     # encoded_training_patients = encode_patients(training_patients, training_data, encoder)
     # encoded_val_patients = encode_patients(val_patients, val_data, encoder)

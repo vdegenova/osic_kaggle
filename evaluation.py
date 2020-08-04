@@ -41,7 +41,7 @@ def read_example_submission(filepath=EXAMPLE_SUBMISSION_PATH):
 
 def main():
     # submission_df = read_example_submission()
-    submission_df = read_submission('./training_data_output.csv')
+    submission_df = read_submission('./training_data_output_q90.csv')
     metric = evaluate_submission(submission_df)
     print('Laplace Log Likelihood: {}'.format(metric))
 
