@@ -15,6 +15,7 @@ def infer(model, x):
     preds = model.predict(x)
     return preds
 
+
 def main():
     regressor = load_model()
 
@@ -35,20 +36,21 @@ def main():
     patient_ids = np.asarray(all_data['Patient'])
 
     true_values = []
-    predictions = []
+    patient_weeks = []
+    FVCs = []
+    confidences = []
+    CONF_VALUE = 100
 
     for patient, pred, truth, patient_id in zip(X, preds, y_arr, patient_ids):
-        print(f"ID: {patient_id} Weeks: {patient[0]}, Patient: {patient[1]}, Percent: {patient[2]}")
-        print(f'Pred: {pred[0]}, Truth: {truth}')
-
-        predictions.append(pred[0])
+        # print(f"ID: {patient_id} Weeks: {patient[0]} Pred: {pred[0]}, Truth: {truth}")
+        patient_week = f"{patient_id}_{patient[0]}"
+        patient_weeks.append(patient_week)
+        FVCs.append(pred[0])
+        confidences.append(CONF_VALUE)
         true_values.append(truth)
-        if patient_id != patient_ids[0]:
-            break
     
-    plt.scatter(predictions, true_values)
-    plt.show()
-    
+    results_df = pd.DataFrame({'Patient_Week': patient_weeks, 'FVC': FVCs, 'Confidence': confidences, 'Truth': true_values})    
+    results_df.to_csv('./training_data_output.csv', index=False)
     
 
 if __name__ == "__main__":

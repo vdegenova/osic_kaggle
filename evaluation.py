@@ -20,6 +20,13 @@ def evaluate_submission(eval_df):
         log_likelihoods.append(laplace_log_likelihood)
     return np.mean(log_likelihoods)
 
+def read_submission(filepath):
+    if not filepath:
+        print("No Input Filepath given")
+        return None
+    submission_df = pd.read_csv(filepath)
+    return submission_df
+
 def read_example_submission(filepath=EXAMPLE_SUBMISSION_PATH):
     """
     I'm using the sample submission here, and just adding noise to the prediction column to simulate the "true values"
@@ -33,7 +40,8 @@ def read_example_submission(filepath=EXAMPLE_SUBMISSION_PATH):
     return submission_df
 
 def main():
-    submission_df = read_example_submission()
+    # submission_df = read_example_submission()
+    submission_df = read_submission('./training_data_output.csv')
     metric = evaluate_submission(submission_df)
     print('Laplace Log Likelihood: {}'.format(metric))
 
