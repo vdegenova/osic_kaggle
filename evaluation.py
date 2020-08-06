@@ -40,10 +40,14 @@ def read_example_submission(filepath=EXAMPLE_SUBMISSION_PATH):
     return submission_df
 
 def main():
+    submission_filepath = './evaluation_output_training_data_q90.csv'
+    submission_df = read_submission(submission_filepath)
+
+    ### use this to try the sample submission ###
     # submission_df = read_example_submission()
-    submission_df = read_submission('./training_data_output_q90.csv')
+
     metric = evaluate_submission(submission_df)
-    print('Laplace Log Likelihood: {}'.format(metric))
+    print(f'Laplace Log Likelihood: {metric}')
 
 if __name__ == "__main__":
     main()
