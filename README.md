@@ -1,6 +1,5 @@
 # OSIC Pulmonary Fibrosis Progression Kaggle Challenge
-Team Bondi Boiz repo for the OSIC Kaggle Challenge
-[Kaggle Competition  Link](https://www.kaggle.com/c/osic-pulmonary-fibrosis-progression/overview)
+Team Bondi Boiz repo for the [OSIC Kaggle Challenge](https://www.kaggle.com/c/osic-pulmonary-fibrosis-progression/overview)
 
 ## Directory Structure
 
