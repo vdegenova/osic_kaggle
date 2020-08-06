@@ -9,5 +9,6 @@ Team Bondi Boiz repo for the [OSIC Kaggle Challenge](https://www.kaggle.com/c/os
 ├── models                 # Trained models
 ├── notebooks              # Jupyter Notebooks for EDA
 ├── scripts                # Source files (.py)
+├── requirements.txt  
 └── README.md
 ```
