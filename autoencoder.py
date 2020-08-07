@@ -141,7 +141,7 @@ def train_model(model, training_data, val_data, suffix=None, n_epochs=10):
     print('Min: %.3f, Max: %.3f' % (val_data.min(), val_data.max()))
 
     opt = tf.keras.optimizers.Adam(learning_rate=1e-4)
-    model.compile(optimizer=opt, loss='binary_crossentropy')
+    model.compile(optimizer=opt, loss='logcosh')
 
     model_checkpoint_callback = ModelCheckpoint(
         filepath=f'./autoencoder_model_{"" if suffix is None else suffix}_{datetime.datetime.now()}',
@@ -183,11 +183,11 @@ def main():
 
     # Load training + validation data from preprocessed .npy
     # preprocessed_npy = './data/processed_data/171-images-with_ids-64-64-8-2020-07-31 15:17:13.995120.npy'
-    preprocessed_npy = './data/processed_data/171-images-with_ids-64-64-8-2020-08-01 22:38:35.378502.npy'
+    preprocessed_npy = './data/processed_data/170-images-with_ids-64-64-8-2020-08-02 22:08:47.264529.npy'
     training_data, val_data, training_patients, val_patients = get_training__and_validation_data_and_patients(preprocessed_npy)
     
     # Train model
-    train_model(autoencoder, training_data, val_data, n_epochs=120)
+    train_model(autoencoder, training_data, val_data, n_epochs=150)
 
     # Record final embedding for each patient {PatientID: flatten(embeddings)}
     encoded_training_patients = encode_patients(training_patients, training_data, encoder)
