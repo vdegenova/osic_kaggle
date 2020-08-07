@@ -31,3 +31,9 @@ osic-kaggle/
 data/train/
 data/test/
 data/.DS_Store
+
+# misc files
+*.csv
+*.png
+*.npy
+autoencoder_model_*/

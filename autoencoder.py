@@ -183,11 +183,11 @@ def main():
 
     # Load training + validation data from preprocessed .npy
     # preprocessed_npy = './data/processed_data/171-images-with_ids-64-64-8-2020-07-31 15:17:13.995120.npy'
-    preprocessed_npy = './data/processed_data/170-images-with_ids-64-64-8-2020-08-02 22:08:47.264529.npy'
+    preprocessed_npy = './data/processed_data/170-images-with_ids-64-64-8-2020-08-06 22:43:50.160195.npy'
     training_data, val_data, training_patients, val_patients = get_training__and_validation_data_and_patients(preprocessed_npy)
     
     # Train model
-    train_model(autoencoder, training_data, val_data, n_epochs=150)
+    train_model(autoencoder, training_data, val_data, n_epochs=50)
 
     # Record final embedding for each patient {PatientID: flatten(embeddings)}
     encoded_training_patients = encode_patients(training_patients, training_data, encoder)
