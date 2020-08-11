@@ -66,47 +66,9 @@ def create_experimental_autoencoder(img_px_size=64, slice_count=8):
     decoded = Conv3D(1, (3, 3, 3), activation='sigmoid', padding="same")(x)
 
     autoencoder = Model(input_img, decoded)
-    autoencoder.compile(optimizer='adam', loss='binary_crossentropy')
     encoder = Model(input_img, encoded)
-
-    autoencoder.summary()
 
     return autoencoder, encoder
-
-def create_autoencoder(img_px_size=32, slice_count=8):
-    """
-    this model assumes (32, 32, 8) is the dimensionality of the 3D input
-    """
-    tf.keras.backend.set_image_data_format('channels_last')
-
-    IMG_PX_SIZE = img_px_size
-    SLICE_COUNT = slice_count
-
-    input_shape = (IMG_PX_SIZE, IMG_PX_SIZE, SLICE_COUNT, 1)
-    input_img = Input(shape=input_shape)
-
-    # encoder portion
-    x = Conv3D(16, (3, 3, 3), activation='relu', padding="same")(input_img)
-    x = MaxPooling3D((2, 2, 2), padding="same")(x)
-    x = Conv3D(8, (3, 3, 3), activation='relu', padding="same")(x)
-    x = MaxPooling3D((2, 2, 2), padding="same")(x)
-    x = Conv3D(8, (3, 3, 3), activation='relu', padding="same")(x)
-    encoded = MaxPooling3D((2, 2, 2), padding="same")(x)
-    # at this point the representation is compressed to 4*4*8 = 128 dims
-    # decoder portion
-    x = Conv3D(8, (3, 3, 3), activation='relu', padding="same")(encoded)
-    x = UpSampling3D((2, 2, 2))(encoded)
-    x = Conv3D(8, (3, 3, 3), activation='relu', padding="same")(x)
-    x = UpSampling3D((2, 2, 2))(x)
-    x = Conv3D(16, (3, 3, 3), activation='relu', padding="same")(x)
-    x = UpSampling3D((2, 2, 2))(x)
-    decoded = Conv3D(1, (3, 3, 3), activation='sigmoid', padding="same")(x)
-
-    autoencoder = Model(input_img, decoded)
-    autoencoder.compile(optimizer = 'adam', loss='binary_crossentropy')
-    encoder = Model(input_img, encoded)
-
-    return autoencoder,encoder
 
 ###############################################################
 ############### now lets grab the training data ###############
@@ -142,6 +104,7 @@ def train_model(model, training_data, val_data, suffix=None, n_epochs=10):
 
     opt = tf.keras.optimizers.Adam(learning_rate=1e-4)
     model.compile(optimizer=opt, loss='logcosh')
+    model.summary()
 
     now = datetime.datetime.now().isoformat(timespec='minutes')
 
@@ -185,11 +148,11 @@ def main():
 
     # Load training + validation data from preprocessed .npy
     # preprocessed_npy = './data/processed_data/171-images-with_ids-64-64-8-2020-07-31 15:17:13.995120.npy'
-    preprocessed_npy = './data/processed_data/170-images-with_ids-64-64-8-2020-08-06 22:43:50.160195.npy'
+    preprocessed_npy = './data/processed_data/170-images-with_ids-64-64-8-2020-08-06 22_43_50.160195.npy'
     training_data, val_data, training_patients, val_patients = get_training__and_validation_data_and_patients(preprocessed_npy)
     
     # Train model
-    train_model(autoencoder, training_data, val_data, n_epochs=50)
+    train_model(autoencoder, training_data, val_data, n_epochs=20)
 
     # Record final embedding for each patient {PatientID: flatten(embeddings)}
     encoded_training_patients = encode_patients(training_patients, training_data, encoder)
@@ -197,7 +160,8 @@ def main():
     all_encoded_patients = merge_dicts(encoded_training_patients, encoded_val_patients)
     
     # Save embeddings as pkl of dictionary
-    encoding_filepath += "-{}".format(datetime.datetime.now())
+    now = datetime.datetime.now().isoformat(timespec='minutes')
+    encoding_filepath += f"-{now}"
     print("{} Patients encoded.".format(len(all_encoded_patients)))
     print("Saving to {}.pkl".format(encoding_filepath))
 

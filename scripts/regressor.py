@@ -88,7 +88,7 @@ def main():
 
     # pass embedding + csv filepaths to function to unify into one dataframe
     #embeddings_path = './data/processed_data/patient_ids_to_encodings_dict-2020-07-31 17:09:25.371193.pkl'
-    embeddings_path = './data/processed_data/patient_ids_to_encodings_dict-2020-07-26 13:50:14.433337.pkl'
+    embeddings_path = './data/processed_data/patient_ids_to_encodings_dict-2020-08-10T21:33.pkl'
     csv_path = './data/train.csv'
     all_data = load_pickled_encodings(embeddings_path, csv_path)
     X = all_data.drop(columns = 'FVC') # keep as a dataframe to pass to pipeline
