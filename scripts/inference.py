@@ -1,4 +1,5 @@
 import pickle
+import datetime
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -27,10 +28,11 @@ def infer(model, x):
 
 def main():
     # initialize filepaths
-    results_filename ='./data/evaluation_output/evaluation_output_training_data_q90.csv'
-    regressor_path = './models/regressor_model_og_regressor_2020-08-05T21:18'
-    quantile_regressor_path = './models/regressor_model_quantile_90_2020-08-05T21:19'
-    embeddings_path = './data/processed_data/patient_ids_to_encodings_dict-2020-07-26 13:50:14.433337.pkl'
+    now = datetime.datetime.now().isoformat(timespec='minutes')
+    results_filename =f'./data/evaluation_output/evaluation_output_training_data_q90_{now}.csv'
+    regressor_path = './models/regressor_model_og_regressor_2020-08-10T21:36'
+    quantile_regressor_path = './models/regressor_model_quantile_90_2020-08-10T21:37'
+    embeddings_path = './data/processed_data/patient_ids_to_encodings_dict-2020-08-10T21:33.pkl'
     csv_path = './data/train.csv'
 
     # load in regressor and quantile regressor
