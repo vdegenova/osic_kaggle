@@ -4,6 +4,7 @@ import pickle
 import datetime
 import numpy as np
 import tensorflow as tf
+from tensorflow import keras
 from tensorflow.keras.layers import UpSampling3D
 from tensorflow.keras.layers import Input
 from tensorflow.keras.layers import Conv3D
@@ -103,10 +104,62 @@ def create_autoencoder(img_px_size=32, slice_count=8):
     decoded = Conv3D(1, (3, 3, 3), activation='sigmoid', padding="same")(x)
 
     autoencoder = Model(input_img, decoded)
-    autoencoder.compile(optimizer = 'adam', loss='binary_crossentropy')
+    # autoencoder.compile(optimizer = 'adam', loss='binary_crossentropy')
     encoder = Model(input_img, encoded)
 
-    return autoencoder,encoder
+    return autoencoder, encoder
+
+def create_jesse_autoencoder(img_px_size=64, slice_count=8):
+    """
+    this model assumes (64, 64, 8) is the dimensionality of the 3D input
+    """
+    tf.keras.backend.set_image_data_format('channels_last')
+
+    IMG_PX_SIZE = img_px_size
+    SLICE_COUNT = slice_count
+
+    input_shape = (IMG_PX_SIZE, IMG_PX_SIZE, SLICE_COUNT, 1)
+    input_img = Input(shape=input_shape)
+
+    # encoder portion
+    encoder = keras.Sequential(
+        [
+            Conv3D(50, (5, 5, 5), activation='relu', padding="same", input_shape=input_shape),
+            MaxPooling3D((2, 2, 2), padding="same"),
+            Conv3D(50, (3, 3, 3), activation='relu', padding="same"),
+            MaxPooling3D((2, 2, 2), padding="same"),
+            Conv3D(50, (3, 3, 3), activation='relu', padding="same"),
+            MaxPooling3D((2, 2, 2), padding="same"),
+            Flatten(),
+            Dense(500, activation="relu")
+        ]
+    ) # at this point the representation is compressed to 500 dims
+
+    # decoder portion
+    decoder = keras.Sequential(
+        [
+            Dense(3200, activation="relu", input_shape=(1,500)),
+            Reshape((8, 8, 1, 50)),
+            Conv3D(50, (3, 3, 3), activation='relu', padding="same"),
+            UpSampling3D((2, 2, 2)),
+            Conv3D(50, (3, 3, 3), activation='relu', padding="same"),
+            UpSampling3D((2, 2, 2)),
+            Conv3D(50, (5, 5, 5), activation='relu', padding="same"),
+            UpSampling3D((2, 2, 2)),
+            Conv3D(1, (3, 3, 3), activation='sigmoid', padding="same")
+        ]
+    )
+
+    # autoencoder sequential model
+    autoencoder = keras.Sequential(
+        [
+            encoder,
+            decoder
+        ]
+    )
+    autoencoder.summary()
+
+    return autoencoder, encoder
 
 ###############################################################
 ############### now lets grab the training data ###############
@@ -140,20 +193,25 @@ def train_model(model, training_data, val_data, suffix=None, n_epochs=10):
     print('Min: %.3f, Max: %.3f' % (training_data.min(), training_data.max()))
     print('Min: %.3f, Max: %.3f' % (val_data.min(), val_data.max()))
 
+    # compile model
     opt = tf.keras.optimizers.Adam(learning_rate=1e-4)
     model.compile(optimizer=opt, loss='logcosh')
 
+    # prepare model checkpoint callback
     now = datetime.datetime.now().isoformat(timespec='minutes')
-
     model_checkpoint_callback = ModelCheckpoint(
         filepath=f'./models/autoencoder_model_{"" if suffix is None else suffix}_{now}',
         monitor='val_loss',
         save_best_only=True
     )
+    # prepare tensorboard callback
+    log_dir='/tmp/autoencoder/' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     tensorboard_callback = TensorBoard(
-        log_dir='/tmp/autoencoder'
-    )
+        log_dir=log_dir,
+        histogram_freq=1
+        ) # call tensorboard with tensorboard --logdir /tmp/autoencoder
 
+    # train model
     model.fit(training_data, training_data,
                     epochs=n_epochs,
                     batch_size=32,
@@ -176,9 +234,8 @@ def encode_patients(patient_ids, patient_images, model):
 def main():
     encoding_filepath = './data/processed_data/patient_ids_to_encodings_dict'
     # removing the directory for TensorBoard logs if it already exists
-    if os.path.exists('/tmp/autoencoder'):
-        shutil.rmtree('/tmp/autoencoder')
-        # tensorboard --logdir /tmp/autoencoder
+    # if os.path.exists('/tmp/autoencoder'):
+    #     shutil.rmtree('/tmp/autoencoder')
 
     # Create model architecture
     autoencoder, encoder = create_experimental_autoencoder()
