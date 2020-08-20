@@ -246,52 +246,48 @@ def train_with_augmentation(model, training_data, val_data, suffix=None, n_epoch
         histogram_freq=3
         ) # call tensorboard with tensorboard --logdir /tmp/autoencoder
 
-    # prepare datagenerator
-    train_datagen = ImageDataGenerator(
-        featurewise_center=True,
-        rotation_range=90,
+    # prepare datagenerator(s)
+    data_gen_args = dict(
+        rotation_range=5,
         width_shift_range=0.05,
         height_shift_range=0.05,
         horizontal_flip=True)
-    # compute quantities required for featurewise normalization
-    # (std, mean, and principal components if ZCA whitening is applied)
-    train_datagen.fit(training_data)
 
-    ###### TEST IMAGE AUGMENTATION ######
-    # import matplotlib.pyplot as plt
-    # example = next(train_datagen.flow(training_data, batch_size=32))
-    # for j in range(example.shape[0]):
-    #     plt.close()
-    #     fig, ax = plt.subplots(nrows = 2, ncols = 4)
-    #     for i in range(example.shape[-1]):
-    #         ax[i // 4, i % 4].imshow(example[j,:,:,i])
-    #     plt.tight_layout()
-    #     plt.show()
+    input_datagen = ImageDataGenerator(**data_gen_args)
+    output_datagen = ImageDataGenerator(**data_gen_args)
+
+    seed = 1
+    
+    input_generator = input_datagen.flow(training_data, batch_size=32, seed=seed)
+    output_generator = output_datagen.flow(training_data, batch_size=32, seed=seed)
+
+    train_generator = zip(input_generator, output_generator)
 
     # train model
-    for e in range(n_epochs):
-        print('Epoch', e)
-        batches = 0
-        for x_batch in train_datagen.flow(training_data, batch_size=32):
-            model.fit(x_batch, x_batch,
-                validation_data=(val_data, val_data),
-                callbacks=[tensorboard_callback, model_checkpoint_callback])
-            batches += 1
-            if batches >= len(training_data) / 32:
-                # we need to break the loop by hand because
-                # the generator loops indefinitely
-                break
-        # calculate validation loss
-        #print(model.evaluate(val_data, val_data))
-        print(f'completed epoch {e}')
 
+    model.fit_generator(train_generator,
+        epochs=n_epochs,
+        steps_per_epoch=5,
+        shuffle=True,
+        validation_data=(val_data, val_data),
+        callbacks=[tensorboard_callback, model_checkpoint_callback])
 
-    # model.fit(training_data, training_data,
-    #                 epochs=n_epochs,
-    #                 batch_size=32,
-    #                 shuffle=True,
-    #                 validation_data=(val_data, val_data),
-    #                 callbacks=[tensorboard_callback, model_checkpoint_callback])
+    # for e in range(n_epochs):
+    #     print('Epoch', e)
+    #     batches = 0
+    #     for x_batch in train_datagen.flow(training_data, batch_size=32):
+    #         model.fit(x_batch, x_batch,
+    #             validation_data=(val_data, val_data),
+    #             callbacks=[tensorboard_callback, model_checkpoint_callback])
+    #         batches += 1
+    #         if batches >= len(training_data) / 32:
+    #             # we need to break the loop by hand because
+    #             # the generator loops indefinitely
+    #             break
+    #     # calculate validation loss
+    #     #print(model.evaluate(val_data, val_data))
+    #     print(f'completed epoch {e}')
+
 
 ##############################################################
 ################ function for encoding patients ##############
@@ -322,7 +318,7 @@ def main():
     training_data, val_data, training_patients, val_patients = get_training__and_validation_data_and_patients(preprocessed_npy)
     
     # Train model
-    train_with_augmentation(autoencoder, training_data, val_data, n_epochs=20)
+    train_with_augmentation(autoencoder, training_data, val_data, n_epochs=50)
 
     # Record final embedding for each patient {PatientID: flatten(embeddings)}
     encoded_training_patients = encode_patients(training_patients, training_data, encoder)
