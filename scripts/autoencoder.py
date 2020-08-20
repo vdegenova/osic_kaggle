@@ -45,27 +45,30 @@ def create_experimental_autoencoder(img_px_size=64, slice_count=8):
     input_shape = (IMG_PX_SIZE, IMG_PX_SIZE, SLICE_COUNT, 1)
     input_img = Input(shape=input_shape)
 
+    initializer = tf.keras.initializers.GlorotNormal()
+
+
     # encoder portion
-    x = Conv3D(50, (5, 5, 5), activation='relu', padding="same")(input_img)
+    x = Conv3D(50, (5, 5, 5), activation='relu', padding="same", kernel_initializer=initializer)(input_img)
     x = MaxPooling3D((2, 2, 2), padding="same")(x)
-    x = Conv3D(50, (3, 3, 3), activation='relu', padding="same")(x)
+    x = Conv3D(50, (3, 3, 3), activation='relu', padding="same", kernel_initializer=initializer)(x)
     x = MaxPooling3D((2, 2, 2), padding="same")(x)
-    x = Conv3D(50, (3, 3, 3), activation='relu', padding="same")(x)
+    x = Conv3D(50, (3, 3, 3), activation='relu', padding="same", kernel_initializer=initializer)(x)
     x = MaxPooling3D((2, 2, 2), padding="same")(x)
     x = Flatten()(x)
-    encoded = Dense(500, activation="relu")(x)
+    encoded = Dense(500, activation="relu", kernel_initializer=initializer)(x)
     # at this point the representation is compressed to 500 dims
 
     # decoder portion
-    x = Dense(3200, activation="relu")(encoded)
+    x = Dense(3200, activation="relu", kernel_initializer=initializer)(encoded)
     x = Reshape((8, 8, 1, 50))(x)
-    x = Conv3D(50, (3, 3, 3), activation='relu', padding="same")(x)
+    x = Conv3D(50, (3, 3, 3), activation='relu', padding="same", kernel_initializer=initializer)(x)
     x = UpSampling3D((2, 2, 2))(x)
-    x = Conv3D(50, (3, 3, 3), activation='relu', padding="same")(x)
+    x = Conv3D(50, (3, 3, 3), activation='relu', padding="same", kernel_initializer=initializer)(x)
     x = UpSampling3D((2, 2, 2))(x)
-    x = Conv3D(50, (5, 5, 5), activation='relu', padding="same")(x)
+    x = Conv3D(50, (5, 5, 5), activation='relu', padding="same", kernel_initializer=initializer)(x)
     x = UpSampling3D((2, 2, 2))(x)
-    decoded = Conv3D(1, (3, 3, 3), activation='sigmoid', padding="same")(x)
+    decoded = Conv3D(1, (3, 3, 3), activation='sigmoid', padding="same", kernel_initializer=initializer)(x)
 
     autoencoder = Model(input_img, decoded)
     encoder = Model(input_img, encoded)
@@ -229,7 +232,7 @@ def train_with_augmentation(model, training_data, val_data, suffix=None, n_epoch
     print('Min: %.3f, Max: %.3f' % (val_data.min(), val_data.max()))
 
     # compile model
-    opt = tf.keras.optimizers.Adam(learning_rate=1e-4)
+    opt = tf.keras.optimizers.Adam(learning_rate=1e-3)
     model.compile(optimizer=opt, loss='binary_crossentropy')
     model.summary()
 
