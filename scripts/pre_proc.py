@@ -291,9 +291,9 @@ def save_to_disk(data, img_px_size=32, slice_count=8):
 
 
 def main():
-    img_px_size = 64
+    img_px_size = 128
     slice_count = 8
-    patient_data = read_in_data(data_dir="./data/train/", img_px_size=img_px_size, slice_count=slice_count, verbose=True)
+    patient_data = read_in_data(data_dir="./data/processed_data/", img_px_size=img_px_size, slice_count=slice_count, verbose=True)
     save_to_disk(patient_data, img_px_size=img_px_size, slice_count=slice_count)
 
 

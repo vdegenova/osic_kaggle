@@ -14,6 +14,7 @@ from tensorflow.keras.layers import Flatten
 from tensorflow.keras.layers import Reshape
 from tensorflow.keras.models import Model
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 ############################################################
 ##################### helper functions #####################
@@ -205,7 +206,7 @@ def train_model(model, training_data, val_data, suffix=None, n_epochs=10):
     log_dir='/tmp/autoencoder/' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     tensorboard_callback = TensorBoard(
         log_dir=log_dir,
-        histogram_freq=1
+        histogram_freq=3
         ) # call tensorboard with tensorboard --logdir /tmp/autoencoder
 
     # train model
@@ -215,6 +216,82 @@ def train_model(model, training_data, val_data, suffix=None, n_epochs=10):
                     shuffle=True,
                     validation_data=(val_data, val_data),
                     callbacks=[tensorboard_callback, model_checkpoint_callback])
+
+
+def train_with_augmentation(model, training_data, val_data, suffix=None, n_epochs=10):
+    '''
+    https://www.tensorflow.org/api_docs/python/tf/keras/preprocessing/image/ImageDataGenerator
+    '''
+    print("Training data shape: {}".format(training_data.shape))
+    print("Validation data shape: {}".format(val_data.shape))
+    print('Min: %.3f, Max: %.3f' % (training_data.min(), training_data.max()))
+    print('Min: %.3f, Max: %.3f' % (val_data.min(), val_data.max()))
+
+    # compile model
+    opt = tf.keras.optimizers.Adam(learning_rate=1e-4)
+    model.compile(optimizer=opt, loss='logcosh')
+    model.summary()
+
+    # prepare model checkpoint callback
+    now = datetime.datetime.now().isoformat(timespec='minutes')
+    model_checkpoint_callback = ModelCheckpoint(
+        filepath=f'./models/autoencoder_model_{"" if suffix is None else suffix}_{now}',
+        monitor='val_loss',
+        save_best_only=True
+    )
+    # prepare tensorboard callback
+    log_dir='/tmp/autoencoder/' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    tensorboard_callback = TensorBoard(
+        log_dir=log_dir,
+        histogram_freq=3
+        ) # call tensorboard with tensorboard --logdir /tmp/autoencoder
+
+    # prepare datagenerator
+    train_datagen = ImageDataGenerator(
+        featurewise_center=True,
+        rotation_range=90,
+        width_shift_range=0.05,
+        height_shift_range=0.05,
+        horizontal_flip=True)
+    # compute quantities required for featurewise normalization
+    # (std, mean, and principal components if ZCA whitening is applied)
+    train_datagen.fit(training_data)
+
+    ###### TEST IMAGE AUGMENTATION ######
+    # import matplotlib.pyplot as plt
+    # example = next(train_datagen.flow(training_data, batch_size=32))
+    # for j in range(example.shape[0]):
+    #     plt.close()
+    #     fig, ax = plt.subplots(nrows = 2, ncols = 4)
+    #     for i in range(example.shape[-1]):
+    #         ax[i // 4, i % 4].imshow(example[j,:,:,i])
+    #     plt.tight_layout()
+    #     plt.show()
+
+    # train model
+    for e in range(n_epochs):
+        print('Epoch', e)
+        batches = 0
+        for x_batch in train_datagen.flow(training_data, batch_size=32):
+            model.fit(x_batch, x_batch,
+                validation_data=(val_data, val_data),
+                callbacks=[tensorboard_callback, model_checkpoint_callback])
+            batches += 1
+            if batches >= len(training_data) / 32:
+                # we need to break the loop by hand because
+                # the generator loops indefinitely
+                break
+        # calculate validation loss
+        #print(model.evaluate(val_data, val_data))
+        print(f'completed epoch {e}')
+
+
+    # model.fit(training_data, training_data,
+    #                 epochs=n_epochs,
+    #                 batch_size=32,
+    #                 shuffle=True,
+    #                 validation_data=(val_data, val_data),
+    #                 callbacks=[tensorboard_callback, model_checkpoint_callback])
 
 ##############################################################
 ################ function for encoding patients ##############
@@ -238,12 +315,14 @@ def main():
     autoencoder, encoder = create_experimental_autoencoder()
 
     # Load training + validation data from preprocessed .npy
-    # preprocessed_npy = './data/processed_data/171-images-with_ids-64-64-8-2020-07-31 15:17:13.995120.npy'
-    preprocessed_npy = './data/processed_data/170-images-with_ids-64-64-8-2020-08-06 22_43_50.160195.npy'
+    # 64x64
+    preprocessed_npy = './data/processed_data/170-images-with_ids-64-64-8-2020-08-06 22:43:50.160195.npy'
+    # 128x128 
+    # preprocessed_npy = './data/processed_data/170-images-with_ids-128-128-8-2020-08-08 18:14:26.136220.npy'
     training_data, val_data, training_patients, val_patients = get_training__and_validation_data_and_patients(preprocessed_npy)
     
     # Train model
-    train_model(autoencoder, training_data, val_data, n_epochs=20)
+    train_with_augmentation(autoencoder, training_data, val_data, n_epochs=20)
 
     # Record final embedding for each patient {PatientID: flatten(embeddings)}
     encoded_training_patients = encode_patients(training_patients, training_data, encoder)
