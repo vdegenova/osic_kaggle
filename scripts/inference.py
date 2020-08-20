@@ -9,7 +9,7 @@ import keras.losses
 
 
 # custom modules
-from post_proc import get_pipeline_selectors, get_postproc_pipeline, load_pickled_encodings
+from pipelines import get_pipeline_selectors, get_postproc_pipeline, load_pickled_encodings
 
 def tilted_loss(y, f):
     q = 0.9

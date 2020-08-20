@@ -17,7 +17,7 @@ from functools  import partial
 
 
 # custom modules
-from post_proc import get_pipeline_selectors, get_postproc_pipeline, load_pickled_encodings
+from pipelines import get_pipeline_selectors, get_postproc_pipeline, load_pickled_encodings
 
 ############################################################
 ############### first let's define the model ###############
