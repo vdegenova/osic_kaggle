@@ -15,6 +15,7 @@ from tensorflow.keras.layers import Reshape
 from tensorflow.keras.models import Model
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from volume_image_gen import customImageDataGenerator
 
 ############################################################
 ##################### helper functions #####################
@@ -130,13 +131,13 @@ def create_jesse_autoencoder(img_px_size=64, slice_count=8):
             MaxPooling3D((2, 2, 2), padding="same"),
             Flatten(),
             Dense(500, activation="relu", kernel_initializer=initializer)
-        ]
+        ], name = 'sequential_encoder'
     ) # at this point the representation is compressed to 500 dims
 
     # decoder portion
     decoder = keras.Sequential(
         [
-            Dense(3200, activation="relu", input_shape=(1,500), kernel_initializer=initializer),
+            Dense(3200, activation="relu", input_shape=(500,), kernel_initializer=initializer),
             Reshape((8, 8, 1, 50)),
             Conv3D(50, (3, 3, 3), activation='relu', padding="same", kernel_initializer=initializer),
             UpSampling3D((2, 2, 2)),
@@ -145,7 +146,7 @@ def create_jesse_autoencoder(img_px_size=64, slice_count=8):
             Conv3D(50, (5, 5, 5), activation='relu', padding="same", kernel_initializer=initializer),
             UpSampling3D((2, 2, 2)),
             Conv3D(1, (3, 3, 3), activation='sigmoid', padding="same", kernel_initializer=initializer)
-        ]
+        ], name = 'sequential_decoder'
     )
 
     # autoencoder sequential model
@@ -153,9 +154,10 @@ def create_jesse_autoencoder(img_px_size=64, slice_count=8):
         [
             encoder,
             decoder
-        ]
+        ], name = 'sequential_autoencoder'
     )
-    autoencoder.summary()
+    for submodel in autoencoder.layers:
+        submodel.summary()
 
     return autoencoder, encoder
 
@@ -229,8 +231,11 @@ def train_with_augmentation(model, training_data, val_data, suffix=None, n_epoch
     print('Min: %.3f, Max: %.3f' % (val_data.min(), val_data.max()))
 
     # compile model
-    opt = tf.keras.optimizers.Adam(learning_rate=1e-4)
-    model.compile(optimizer=opt, loss='binary_crossentropy')
+    opt = tf.keras.optimizers.Adam(learning_rate=1e-3)
+    # opt = tf.keras.optimizers.Adadelta(learning_rate=1e-5)
+    loss = 'binary_crossentropy'
+    # loss = 'MSE'
+    model.compile(optimizer=opt, loss=loss)
     model.summary()
 
     # prepare model checkpoint callback
@@ -249,16 +254,19 @@ def train_with_augmentation(model, training_data, val_data, suffix=None, n_epoch
 
     # prepare datagenerator(s)
     data_gen_args = dict(
-        rotation_range=5,
-        width_shift_range=0.05,
-        height_shift_range=0.05,
+        rotation_range=10,
+        width_shift_range=0.10,
+        height_shift_range=0.10,
         horizontal_flip=True)
 
-    input_datagen = ImageDataGenerator(**data_gen_args)
-    output_datagen = ImageDataGenerator(**data_gen_args)
+    input_datagen = customImageDataGenerator(**data_gen_args)
+    output_datagen = customImageDataGenerator(**data_gen_args)
 
+    # if using customImageDataGenerator, must exapand dims of training data
+    if model.name == 'sequential_autoencoder':
+        training_data = np.expand_dims(training_data, -1)
+        val_data = np.expand_dims(val_data, -1)
     seed = 1
-    
     input_generator = input_datagen.flow(training_data, batch_size=32, seed=seed)
     output_generator = output_datagen.flow(training_data, batch_size=32, seed=seed)
 
@@ -268,26 +276,10 @@ def train_with_augmentation(model, training_data, val_data, suffix=None, n_epoch
 
     model.fit_generator(train_generator,
         epochs=n_epochs,
-        steps_per_epoch=5,
         shuffle=True,
+        steps_per_epoch=4,
         validation_data=(val_data, val_data),
         callbacks=[tensorboard_callback, model_checkpoint_callback])
-
-    # for e in range(n_epochs):
-    #     print('Epoch', e)
-    #     batches = 0
-    #     for x_batch in train_datagen.flow(training_data, batch_size=32):
-    #         model.fit(x_batch, x_batch,
-    #             validation_data=(val_data, val_data),
-    #             callbacks=[tensorboard_callback, model_checkpoint_callback])
-    #         batches += 1
-    #         if batches >= len(training_data) / 32:
-    #             # we need to break the loop by hand because
-    #             # the generator loops indefinitely
-    #             break
-    #     # calculate validation loss
-    #     #print(model.evaluate(val_data, val_data))
-    #     print(f'completed epoch {e}')
 
 
 ##############################################################
@@ -297,6 +289,9 @@ def encode_patients(patient_ids, patient_images, model):
     patient_to_encoding_dict = {}
     
     for (img, patient_id) in zip(patient_images, patient_ids):
+        # will need to expand dims for sequential model to work, need rgb channel (see training with augementation)
+        if model.name == 'sequential_encoder':
+            img = np.expand_dims(img, -1)
         encoding = model.predict(np.array([img])).flatten()
         patient_to_encoding_dict[patient_id] = encoding
 
@@ -309,7 +304,8 @@ def main():
     #     shutil.rmtree('/tmp/autoencoder')
 
     # Create model architecture
-    autoencoder, encoder = create_experimental_autoencoder()
+    # autoencoder, encoder = create_experimental_autoencoder()
+    autoencoder, encoder = create_jesse_autoencoder()
 
     # Load training + validation data from preprocessed .npy
     # 64x64
