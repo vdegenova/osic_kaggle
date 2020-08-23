@@ -219,14 +219,23 @@ def process_data(patient, patient_history_df, img_px_size=32, hm_slices=8, verbo
             masked_slices.append(masked_img)
 
     # resize each pixel array - slices changed type to array here. Start as 512 x 512
-    masked_slices = [resize(np.array(each_slice), (img_px_size, img_px_size)) for each_slice in masked_slices]
+    resized_masked_slices = []
+    for each_slice in masked_slices:
+        CROP_FACTOR = .2
+        x, y = each_slice.shape
+        xmin = int(np.floor(x*CROP_FACTOR))
+        xmax = int(np.floor(x*(1-CROP_FACTOR)))
+        ymin = int(np.floor(y*CROP_FACTOR))
+        ymax = int(np.floor(y*(1-CROP_FACTOR)))
+        resized_masked_slices.append(resize(np.array(each_slice[xmin:xmax, ymin:ymax]), (img_px_size, img_px_size)))
+    # masked_slices = [resize(np.array(each_slice), (img_px_size, img_px_size)) for each_slice in masked_slices]
 
     # try opencv.resize on a different axis
-    masked_slices = np.array(masked_slices)
+    resized_masked_slices = np.array(resized_masked_slices)
     # initialze resized array, then modify each slice along second axis
     chunked_slices = np.zeros(shape=(hm_slices, img_px_size, img_px_size)) # (8, 64, 64)
     for i in range(chunked_slices.shape[1]):
-        chunked_slices[:,i,:] = resize(masked_slices[:,i,:], (img_px_size, hm_slices))
+        chunked_slices[:,i,:] = resize(resized_masked_slices[:,i,:], (img_px_size, hm_slices))
         # interpolation methods are: (https://www.tutorialkart.com/opencv/python/opencv-python-resize-image/)
         # INTER_NEAREST – a nearest-neighbor interpolation
         # INTER_LINEAR – a bilinear interpolation (used by default)
@@ -256,7 +265,7 @@ def read_in_data(data_dir="./data/train/", img_px_size=32, slice_count=8, verbos
         all_the_data (np.array): array of size (n_patients, 2), where each entry is [DICOM_reshape_array, patient_id]
     '''
 
-    patients = os.listdir(data_dir) # list of training patient IDS (folders which contain DICOMS)
+    patients = os.listdir("./data/train/") # list of training patient IDS (folders which contain DICOMS)
     train_df = pd.read_csv("./data/train.csv") # list of training patient tabular data
 
     IMG_PX_SIZE = img_px_size
@@ -291,7 +300,7 @@ def save_to_disk(data, img_px_size=32, slice_count=8):
 
 
 def main():
-    img_px_size = 128
+    img_px_size = 64
     slice_count = 8
     patient_data = read_in_data(data_dir="./data/processed_data/", img_px_size=img_px_size, slice_count=slice_count, verbose=True)
     save_to_disk(patient_data, img_px_size=img_px_size, slice_count=slice_count)

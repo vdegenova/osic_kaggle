@@ -257,7 +257,7 @@ def train_with_augmentation(model, training_data, val_data, suffix=None, n_epoch
 
     # prepare datagenerator(s)
     data_gen_args = dict(
-        rotation_range=10,
+        rotation_range=5,
         width_shift_range=0.10,
         height_shift_range=0.10,
         horizontal_flip=True)
@@ -318,7 +318,7 @@ def main():
     training_data, val_data, training_patients, val_patients = get_training__and_validation_data_and_patients(preprocessed_npy)
     
     # Train model
-    train_with_augmentation(autoencoder, training_data, val_data, n_epochs=50)
+    train_with_augmentation(autoencoder, training_data, val_data, n_epochs=250)
 
     # Record final embedding for each patient {PatientID: flatten(embeddings)}
     encoded_training_patients = encode_patients(training_patients, training_data, encoder)
