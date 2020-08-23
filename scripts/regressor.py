@@ -54,7 +54,7 @@ def create_dense_regressor(n_input_dims, quantile_regression=False):
     else:
         regressor.compile(loss='LogCosh', optimizer='adam')
 
-    regressor.summary()
+    # regressor.summary()
 
     return regressor
 

@@ -8,8 +8,8 @@ from inference import infer
 from evaluation import evaluate_submission
 
 def main():
-    N_AUTOENCODER_EPOCHS = 1
-    N_REGRESSOR_EPOCHS = 5
+    N_AUTOENCODER_EPOCHS = 50
+    N_REGRESSOR_EPOCHS = 50
 
     # assume we've already pre processed the data for now (for experimentation)
     preprocessed_npy = './data/processed_data/170-images-with_ids-64-64-8-2020-08-06 22:43:50.160195.npy'
@@ -18,7 +18,7 @@ def main():
     # create and train autoencoder
     autoencoder, encoder = create_jesse_autoencoder()
     training_data, val_data, training_patients, val_patients = get_training__and_validation_data_and_patients(preprocessed_npy)
-    train_with_augmentation(autoencoder, training_data, val_data, n_epochs=N_AUTOENCODER_EPOCHS)
+    train_with_augmentation(autoencoder, training_data, val_data, n_epochs=N_AUTOENCODER_EPOCHS, lr=1e-3)
 
     # Record final embedding for each patient {PatientID: flatten(embeddings)}
     encoded_training_patients = encode_patients(training_patients, training_data, encoder)

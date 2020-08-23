@@ -50,11 +50,11 @@ def create_experimental_autoencoder(img_px_size=64, slice_count=8):
 
 
     # encoder portion
-    x = Conv3D(50, (5, 5, 5), activation='relu', padding="same", kernel_initializer=initializer)(input_img)
+    x = Conv3D(20, (5, 5, 5), activation='relu', padding="same", kernel_initializer=initializer)(input_img)
     x = MaxPooling3D((2, 2, 2), padding="same")(x)
-    x = Conv3D(50, (3, 3, 3), activation='relu', padding="same", kernel_initializer=initializer)(x)
+    x = Conv3D(20, (3, 3, 3), activation='relu', padding="same", kernel_initializer=initializer)(x)
     x = MaxPooling3D((2, 2, 2), padding="same")(x)
-    x = Conv3D(50, (3, 3, 3), activation='relu', padding="same", kernel_initializer=initializer)(x)
+    x = Conv3D(20, (3, 3, 3), activation='relu', padding="same", kernel_initializer=initializer)(x)
     x = MaxPooling3D((2, 2, 2), padding="same")(x)
     x = Flatten()(x)
     encoded = Dense(500, activation="relu", kernel_initializer=initializer)(x)
@@ -63,11 +63,11 @@ def create_experimental_autoencoder(img_px_size=64, slice_count=8):
     # decoder portion
     x = Dense(3200, activation="relu", kernel_initializer=initializer)(encoded)
     x = Reshape((8, 8, 1, 50))(x)
-    x = Conv3D(50, (3, 3, 3), activation='relu', padding="same", kernel_initializer=initializer)(x)
+    x = Conv3D(20, (3, 3, 3), activation='relu', padding="same", kernel_initializer=initializer)(x)
     x = UpSampling3D((2, 2, 2))(x)
-    x = Conv3D(50, (3, 3, 3), activation='relu', padding="same", kernel_initializer=initializer)(x)
+    x = Conv3D(20, (3, 3, 3), activation='relu', padding="same", kernel_initializer=initializer)(x)
     x = UpSampling3D((2, 2, 2))(x)
-    x = Conv3D(50, (5, 5, 5), activation='relu', padding="same", kernel_initializer=initializer)(x)
+    x = Conv3D(20, (5, 5, 5), activation='relu', padding="same", kernel_initializer=initializer)(x)
     x = UpSampling3D((2, 2, 2))(x)
     decoded = Conv3D(1, (3, 3, 3), activation='sigmoid', padding="same", kernel_initializer=initializer)(x)
 
@@ -159,8 +159,8 @@ def create_jesse_autoencoder(img_px_size=64, slice_count=8):
             decoder
         ], name = 'sequential_autoencoder'
     )
-    for submodel in autoencoder.layers:
-        submodel.summary()
+    # for submodel in autoencoder.layers:
+    #     submodel.summary()
 
     return autoencoder, encoder
 
@@ -199,7 +199,7 @@ def train_model(model, training_data, val_data, suffix=None, n_epochs=10):
     # compile model
     opt = tf.keras.optimizers.Adam(learning_rate=1e-4)
     model.compile(optimizer=opt, loss='logcosh')
-    model.summary()
+    # model.summary()
 
     # prepare model checkpoint callback
     now = datetime.datetime.now().isoformat(timespec='minutes')
@@ -224,7 +224,7 @@ def train_model(model, training_data, val_data, suffix=None, n_epochs=10):
                     callbacks=[tensorboard_callback, model_checkpoint_callback])
 
 
-def train_with_augmentation(model, training_data, val_data, suffix=None, n_epochs=10):
+def train_with_augmentation(model, training_data, val_data, suffix=None, n_epochs=10, lr=1e-3):
     '''
     https://www.tensorflow.org/api_docs/python/tf/keras/preprocessing/image/ImageDataGenerator
     '''
@@ -234,7 +234,7 @@ def train_with_augmentation(model, training_data, val_data, suffix=None, n_epoch
     print('Min: %.3f, Max: %.3f' % (val_data.min(), val_data.max()))
 
     # compile model
-    opt = tf.keras.optimizers.Adam(learning_rate=1e-3)
+    opt = tf.keras.optimizers.Adam(learning_rate=lr)
     # opt = tf.keras.optimizers.Adadelta(learning_rate=1e-5)
     loss = 'binary_crossentropy'
     # loss = 'MSE'
