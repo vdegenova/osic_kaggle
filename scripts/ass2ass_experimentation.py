@@ -12,7 +12,7 @@ def main():
     N_REGRESSOR_EPOCHS = 50
 
     # assume we've already pre processed the data for now (for experimentation)
-    preprocessed_npy = './data/processed_data/170-images-with_ids-64-64-8-2020-08-06 22:43:50.160195.npy'
+    preprocessed_npy = './data/processed_data/158-images-with_ids-64-64-8-2020-08-26T21:54.npy'
     encoding_filepath = './data/processed_data/patient_ids_to_encodings_dict'
 
     # create and train autoencoder
