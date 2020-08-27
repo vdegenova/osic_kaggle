@@ -5,7 +5,7 @@ import pandas as pd                         # data analysis
 import numpy as np                          # array ops
 import matplotlib.pyplot as plt             # used for visualization in dev
 import pydicom                              # for reading dicom files
-from cv2 import resize                      # image processing
+from cv2 import resize, threshold, THRESH_OTSU     # image processing
 from skimage import morphology, measure     # for lung masking
 from sklearn.cluster import KMeans          # for lung masking
 from tqdm import tqdm                       # for progress bars
@@ -188,6 +188,82 @@ def make_lungmask(img, display=False):
     return masked_img, mask_var, n_labels
 
 
+def make_lungmask_v2(img):
+
+    # define new method using otsu's thresholding
+    row_size= img.shape[0]
+    col_size = img.shape[1]
+
+    im_mean = np.mean(img)
+    std = np.std(img)
+    img = img-im_mean
+    img = img/std
+    # Find the average pixel value near the lungs to renormalize washed out images.
+    middle = img[int(col_size/5):int(col_size/5*4),int(row_size/5):int(row_size/5*4)] 
+    im_mean = np.mean(middle)  
+    im_max = np.max(img)
+    im_min = np.min(img)
+    # To improve threshold finding, I'm moving the underflow and overflow on the pixel spectrum
+    img[img==im_max]=im_mean
+    img[img==im_min]=im_mean
+
+    # Rescale pixels to 255
+    img_2d = img.astype(float)                            
+    im_min = np.min(img_2d) # many are not windowed and have vals < 0
+    if im_min < 0:
+        img_2d = img_2d - im_min
+    img = (np.maximum(img_2d,0) / img_2d.max()) * 255.0
+
+    # otsu's binarization thresholding
+    thresh, thresh_img = threshold(img.astype('uint8'), np.min(img), np.max(img), THRESH_OTSU)
+    # rescale to binary and invert
+    thresh_img = np.where(thresh_img==0,1,0)
+
+    ###########################################
+
+    # now copy functionality from the old method to achieve a mask
+
+    # First erode away the finer elements, then dilate to include some of the pixels surrounding the lung.  
+    # We don't want to accidentally clip the lung.
+    erosion = morphology.erosion(thresh_img,np.ones([3,3]))
+    dilation = morphology.dilation(erosion,np.ones([15,15]))
+
+    labels = measure.label(dilation) # Different labels are displayed in different colors
+    labels = labels + 1 # add 1 to every element so that the background is no longer encoded as 0
+    regions = measure.regionprops(labels) # for some reason ignores labels marked 0
+    good_labels = []
+    n_px = len(img.flatten())
+    for prop in regions:
+        B = prop.bbox # (min_row, min_col, max_row, max_col)
+        # region width < 90% of img
+        # region height < 90% of img
+        # min row > 15%, max row < 85%
+        # min col < 15%, max col < 85%
+        # region area is > 0.1% of img
+        if B[2]-B[0]<row_size*.90 and \
+            B[3]-B[1]<col_size*.90 and \
+            B[0]>row_size*.075 and B[2]<row_size*.925 and \
+            B[1]>col_size*.075 and B[3]<col_size*925 and \
+            prop.area/n_px*100 > 0.1:
+            good_labels.append(prop.label) 
+            #print(f'prop {prop.label} area: {np.round(prop.area/n_px*100,2)}, {B}')
+    mask = np.ndarray([row_size,col_size],dtype=np.int8)
+    mask[:] = 0
+
+    #  After just the lungs are left, we do another large dilation
+    #  in order to fill in and out the lung mask 
+    for N in good_labels:
+        mask = mask + np.where(labels==N,1,0)
+    mask = morphology.dilation(mask,np.ones([5,5])) # one last dilation
+
+    # final masked image
+    masked_img = mask*img
+    mask_var = np.round(np.var(mask), 4)
+    n_labels = len(good_labels)
+
+    return masked_img, mask_var, n_labels
+
+
 def process_data(patient, patient_history_df, img_px_size=32, hm_slices=8, verbose=False, data_dir="./data/train/"):
     '''
     Function to read in all of the DICOMS in a patient dir, condense arrays into aggregated chunks
@@ -213,7 +289,7 @@ def process_data(patient, patient_history_df, img_px_size=32, hm_slices=8, verbo
     # lung masking
     masked_slices = []
     for each_slice in tqdm(slices):
-        masked_img, mask_var, n_labels = make_lungmask(each_slice, False)
+        masked_img, mask_var, n_labels = make_lungmask_v2(each_slice)
         # check and see if this slice is worth keeping (contains lungs, did a good job of masking them)
         if mask_var > .04 and n_labels < 10:
             masked_slices.append(masked_img)
