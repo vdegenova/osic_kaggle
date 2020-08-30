@@ -77,6 +77,7 @@ def create_experimental_autoencoder(img_px_size=64, slice_count=8):
 
     return autoencoder, encoder
 
+
 def create_autoencoder(img_px_size=32, slice_count=8):
     """
     this model assumes (32, 32, 8) is the dimensionality of the 3D input
@@ -112,6 +113,7 @@ def create_autoencoder(img_px_size=32, slice_count=8):
 
     return autoencoder, encoder
 
+
 def create_jesse_autoencoder(img_px_size=64, slice_count=8):
     """
     this model assumes (64, 64, 8) is the dimensionality of the 3D input
@@ -120,18 +122,23 @@ def create_jesse_autoencoder(img_px_size=64, slice_count=8):
 
     IMG_PX_SIZE = img_px_size
     SLICE_COUNT = slice_count
-
     input_shape = (IMG_PX_SIZE, IMG_PX_SIZE, SLICE_COUNT, 1)
-
     initializer = tf.keras.initializers.GlorotNormal()
+
+    # model architecture hyperparams
+    conv1_kernels = 20
+    conv2_kernels = 40
+    conv3_kernels = 30
+    learning_rate = 1e-4
+
     # encoder portion
     encoder = keras.Sequential(
         [
-            Conv3D(50, (5, 5, 5), activation='relu', padding="same", input_shape=input_shape, kernel_initializer=initializer),
+            Conv3D(conv1_kernels, (5, 5, 5), activation='relu', padding="same", input_shape=input_shape, kernel_initializer=initializer),
             MaxPooling3D((2, 2, 2), padding="same"),
-            Conv3D(50, (3, 3, 3), activation='relu', padding="same", kernel_initializer=initializer),
+            Conv3D(conv2_kernels, (3, 3, 3), activation='relu', padding="same", kernel_initializer=initializer),
             MaxPooling3D((2, 2, 2), padding="same"),
-            Conv3D(50, (3, 3, 3), activation='relu', padding="same", kernel_initializer=initializer),
+            Conv3D(conv3_kernels, (3, 3, 3), activation='relu', padding="same", kernel_initializer=initializer),
             MaxPooling3D((2, 2, 2), padding="same"),
             Flatten(),
             Dense(500, activation="relu", kernel_initializer=initializer)
@@ -143,11 +150,11 @@ def create_jesse_autoencoder(img_px_size=64, slice_count=8):
         [
             Dense(3200, activation="relu", input_shape=(500,), kernel_initializer=initializer),
             Reshape((8, 8, 1, 50)),
-            Conv3D(50, (3, 3, 3), activation='relu', padding="same", kernel_initializer=initializer),
+            Conv3D(conv3_kernels, (3, 3, 3), activation='relu', padding="same", kernel_initializer=initializer),
             UpSampling3D((2, 2, 2)),
-            Conv3D(50, (3, 3, 3), activation='relu', padding="same", kernel_initializer=initializer),
+            Conv3D(conv2_kernels, (3, 3, 3), activation='relu', padding="same", kernel_initializer=initializer),
             UpSampling3D((2, 2, 2)),
-            Conv3D(50, (5, 5, 5), activation='relu', padding="same", kernel_initializer=initializer),
+            Conv3D(conv1_kernels, (5, 5, 5), activation='relu', padding="same", kernel_initializer=initializer),
             UpSampling3D((2, 2, 2)),
             Conv3D(1, (3, 3, 3), activation='sigmoid', padding="same", kernel_initializer=initializer)
         ], name = 'sequential_decoder'
@@ -162,7 +169,7 @@ def create_jesse_autoencoder(img_px_size=64, slice_count=8):
     )
 
     # compile model
-    opt = tf.keras.optimizers.Adam(learning_rate=1e-4)
+    opt = tf.keras.optimizers.Adam(learning_rate=learning_rate)
     # opt = tf.keras.optimizers.Adadelta(learning_rate=1e-5)
     loss = 'binary_crossentropy'
     # loss = 'MSE'
@@ -309,8 +316,8 @@ def kt_model_builder(hp, img_px_size=64, slice_count=8,):
 
     # keras tuner! start with just a few convolution kernels as example
     hp_conv1_kernels = hp.Int('conv1_kernels', min_value=10, max_value=50, step=10)
-    hp_conv2_kernels = hp.Int('conv1_kernels', min_value=10, max_value=50, step=10)
-    hp_conv3_kernels = hp.Int('conv1_kernels', min_value=10, max_value=50, step=10)
+    hp_conv2_kernels = hp.Int('conv2_kernels', min_value=10, max_value=50, step=10)
+    hp_conv3_kernels = hp.Int('conv3_kernels', min_value=10, max_value=50, step=10)
     hp_lr = hp.Float('learning_rate', min_value=1e-5, max_value=1e-2, sampling='LOG', default=1e-3)
 
     tf.keras.backend.set_image_data_format('channels_last')
@@ -452,7 +459,7 @@ def train_kt_model(training_data, val_data, n_epochs=10, suffix=None):
 
 def main():
     ENCODING_FILEPATH = './data/processed_data/patient_ids_to_encodings_dict'
-    PREPROCESSED_NPY = './data/processed_data/170-images-with_ids-64-64-8-2020-08-06 22:43:50.160195.npy'
+    PREPROCESSED_NPY = './data/processed_data/158-images-with_ids-64-64-8-2020-08-26T21:12.npy'
     KT_SESSION = True
 
     # Load training + validation data from preprocessed .npy
@@ -460,10 +467,11 @@ def main():
     
     if KT_SESSION:
         # train hypermodel
-        train_kt_model(training_data, val_data, n_epochs=10)
+        train_kt_model(training_data, val_data, n_epochs=25)
     else:
         # Train regular model
-        train_with_augmentation(autoencoder, training_data, val_data, n_epochs=250)
+        autoencoder, encoder = create_jesse_autoencoder()
+        train_with_augmentation(autoencoder, training_data, val_data, n_epochs=100)
 
         # Record final embedding for each patient {PatientID: flatten(embeddings)}
         encoded_training_patients = encode_patients(training_patients, training_data, encoder)
