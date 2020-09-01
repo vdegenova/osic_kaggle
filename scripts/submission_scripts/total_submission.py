@@ -21,25 +21,29 @@ from inference import infer
 
 
 def main():
-    # Kaggle specific file paths
-    working_dir = "/kaggle/working/"
-    temp_dir = "/kaggle/temp/"
-    training_dir = "/kaggle/input/osic-pulmonary-fibrosis-progression/train/"
-    training_csv_dir = "/kaggle/input/osic-pulmonary-fibrosis-progression/train.csv"
-    test_dir = "/kaggle/input/osic-pulmonary-fibrosis-progression/test/"
-    test_csv_dir = "/kaggle/input/osic-pulmonary-fibrosis-progression/test.csv"
-    encoding_filepath = f"{working_dir}patient_ids_to_encodings_dict"
-    output_filepath = "/kaggle/working/submission.csv"
 
-    # local filepaths
-    working_dir = "/Users/vdegenova/Projects/osic_kaggle/working/"
-    temp_dir = "/Users/vdegenova/Projects/osic_kaggle/working/temp"
-    training_dir = "/Users/vdegenova/Projects/osic_kaggle/data/train/"
-    training_csv_dir = "/Users/vdegenova/Projects/osic_kaggle/data/train.csv"
-    test_dir = "/Users/vdegenova/Projects/osic_kaggle/data/test/"
-    test_csv_dir = "/Users/vdegenova/Projects/osic_kaggle/data/test.csv"
-    encoding_filepath = f"{working_dir}patient_ids_to_encodings_dict"
-    output_filepath = "/Users/vdegenova/Projects/osic_kaggle/working/submission.csv"
+    is_kaggle_submission = False
+
+    if is_kaggle_submission:
+        # Kaggle specific file paths
+        working_dir = "/kaggle/working/"
+        temp_dir = "/kaggle/temp/"
+        training_dir = "/kaggle/input/osic-pulmonary-fibrosis-progression/train/"
+        training_csv_dir = "/kaggle/input/osic-pulmonary-fibrosis-progression/train.csv"
+        test_dir = "/kaggle/input/osic-pulmonary-fibrosis-progression/test/"
+        test_csv_dir = "/kaggle/input/osic-pulmonary-fibrosis-progression/test.csv"
+        encoding_filepath = f"{working_dir}patient_ids_to_encodings_dict"
+        output_filepath = "/kaggle/working/submission.csv"
+    else:
+        # local filepaths
+        working_dir = "/Users/vdegenova/Projects/osic_kaggle/working/"
+        temp_dir = "/Users/vdegenova/Projects/osic_kaggle/working/temp"
+        training_dir = "/Users/vdegenova/Projects/osic_kaggle/data/train/"
+        training_csv_dir = "/Users/vdegenova/Projects/osic_kaggle/data/train.csv"
+        test_dir = "/Users/vdegenova/Projects/osic_kaggle/data/test/"
+        test_csv_dir = "/Users/vdegenova/Projects/osic_kaggle/data/test.csv"
+        encoding_filepath = f"{working_dir}patient_ids_to_encodings_dict"
+        output_filepath = "/Users/vdegenova/Projects/osic_kaggle/working/submission.csv"
 
     # overall program flow
     # 1. read in data                               (train and test)

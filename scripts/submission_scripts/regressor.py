@@ -28,7 +28,8 @@ from pipelines import (
 ############################################################
 def tilted_loss(y, f, q=0.9):
     """q is which quantile are we predicting (0.9 = 90th percentile)"""
-    e = y - f
+    cast_y = tf.keras.backend.cast(y, dtype="float32")
+    e = cast_y - f
     return K.mean(K.maximum(q * e, (q - 1) * e), axis=-1)
 
 
