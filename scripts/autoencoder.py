@@ -126,10 +126,10 @@ def create_jesse_autoencoder(img_px_size=64, slice_count=8):
     initializer = tf.keras.initializers.GlorotNormal()
 
     # model architecture hyperparams
-    conv1_kernels = 20
-    conv2_kernels = 40
+    conv1_kernels = 30
+    conv2_kernels = 20
     conv3_kernels = 30
-    learning_rate = 1e-4
+    learning_rate = 0.0015
 
     # encoder portion
     encoder = keras.Sequential(
@@ -460,7 +460,23 @@ def train_kt_model(training_data, val_data, n_epochs=10, suffix=None):
 def main():
     ENCODING_FILEPATH = './data/processed_data/patient_ids_to_encodings_dict'
     PREPROCESSED_NPY = './data/processed_data/158-images-with_ids-64-64-8-2020-08-26T21:12.npy'
-    KT_SESSION = True
+    KT_SESSION = False
+
+    '''
+    [Trial summary]
+    |-Trial ID: 5cbb1ef77bdc8a39974d611520ebfd4a
+    |-Score: 0.2765873968601227
+    |-Best step: 0
+    > Hyperparameters:
+    |-conv1_kernels: 30
+    |-conv2_kernels: 20
+    |-conv3_kernels: 30
+    |-learning_rate: 0.001565284883754403
+    |-tuner/bracket: 0
+    |-tuner/epochs: 10
+    |-tuner/initial_epoch: 0
+    |-tuner/round: 0
+    '''
 
     # Load training + validation data from preprocessed .npy
     training_data, val_data, training_patients, val_patients = get_training__and_validation_data_and_patients(PREPROCESSED_NPY)
