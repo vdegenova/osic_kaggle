@@ -2,7 +2,7 @@ import numpy as np
 import pickle
 import datetime
 import pandas as pd
-from pre_proc import read_in_data, save_to_disk
+from pre_proc2 import read_in_data, save_to_disk
 from autoencoder import (
     create_jesse_autoencoder,
     get_training__and_validation_data_and_patients,
@@ -36,17 +36,17 @@ def main():
         output_filepath = "/kaggle/working/submission.csv"
     else:
         # local filepaths
-        working_dir = "/Users/vdegenova/Projects/osic_kaggle/working/"
-        temp_dir = "/Users/vdegenova/Projects/osic_kaggle/working/temp"
-        training_dir = "/Users/vdegenova/Projects/osic_kaggle/data/train/"
-        training_csv_dir = "/Users/vdegenova/Projects/osic_kaggle/data/train.csv"
-        test_dir = "/Users/vdegenova/Projects/osic_kaggle/data/test/"
-        test_csv_dir = "/Users/vdegenova/Projects/osic_kaggle/data/test.csv"
+        working_dir = "./working/"
+        temp_dir = "./temp"
+        training_dir = "./data/train/"
+        training_csv_dir = "./data/train.csv"
+        test_dir = "./data/test/"
+        test_csv_dir = "./data/test.csv"
         encoding_filepath = f"{working_dir}patient_ids_to_encodings_dict"
-        output_filepath = "/Users/vdegenova/Projects/osic_kaggle/working/submission.csv"
+        output_filepath = "./working/submission.csv"
 
-        preprocessed_training_npy = "/Users/vdegenova/Projects/osic_kaggle/working/158-images-with_ids-64-64-8-2020-09-01T21:35.npy"
-        preprocessed_test_npy = "/Users/vdegenova/Projects/osic_kaggle/working/5-images-with_ids-64-64-8-2020-09-01T21:35.npy"
+        # preprocessed_training_npy = "/Users/vdegenova/Projects/osic_kaggle/working/158-images-with_ids-64-64-8-2020-09-01T21:35.npy"
+        # preprocessed_test_npy = "/Users/vdegenova/Projects/osic_kaggle/working/5-images-with_ids-64-64-8-2020-09-01T21:35.npy"
 
     # overall program flow
     # 1. read in data                               (train and test)
@@ -66,38 +66,38 @@ def main():
     ################################################
     # 1. read in data (train and test)
     ################################################
-    # patient_training_data = read_in_data(
-    #     data_dir=training_dir,
-    #     img_px_size=img_px_size,
-    #     slice_count=slice_count,
-    #     verbose=True,
-    #     csv_file=training_csv_dir,
-    # )
-    # patient_test_data = read_in_data(
-    #     data_dir=test_dir,
-    #     img_px_size=img_px_size,
-    #     slice_count=slice_count,
-    #     verbose=True,
-    #     csv_file=test_csv_dir,
-    # )
+    patient_training_data = read_in_data(
+        data_dir=training_dir,
+        img_px_size=img_px_size,
+        slice_count=slice_count,
+        verbose=True,
+        csv_file=training_csv_dir,
+    )
+    patient_test_data = read_in_data(
+        data_dir=test_dir,
+        img_px_size=img_px_size,
+        slice_count=slice_count,
+        verbose=True,
+        csv_file=test_csv_dir,
+    )
 
     ################################################
     # 2. pre process dicom data (train and test)
     ################################################
-    # preprocessed_training_npy = save_to_disk(
-    #     patient_training_data,
-    #     img_px_size=img_px_size,
-    #     slice_count=slice_count,
-    #     working_dir=working_dir,
-    # )
-    # preprocessed_test_npy = save_to_disk(
-    #     patient_test_data,
-    #     img_px_size=img_px_size,
-    #     slice_count=slice_count,
-    #     working_dir=working_dir,
-    # )
-    # del patient_training_data
-    # del patient_test_data
+    preprocessed_training_npy = save_to_disk(
+        patient_training_data,
+        img_px_size=img_px_size,
+        slice_count=slice_count,
+        working_dir=working_dir,
+    )
+    preprocessed_test_npy = save_to_disk(
+        patient_test_data,
+        img_px_size=img_px_size,
+        slice_count=slice_count,
+        working_dir=working_dir,
+    )
+    del patient_training_data
+    del patient_test_data
 
     ################################################
     # 3. train autoencoder (training data)
