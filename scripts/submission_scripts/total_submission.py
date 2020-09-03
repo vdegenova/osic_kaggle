@@ -2,7 +2,7 @@ import numpy as np
 import pickle
 import datetime
 import pandas as pd
-from pre_proc2 import read_in_data, save_to_disk
+from pre_proc import read_in_data, save_to_disk
 from autoencoder import (
     create_jesse_autoencoder,
     get_training__and_validation_data_and_patients,
