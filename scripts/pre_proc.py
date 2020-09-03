@@ -9,6 +9,7 @@ from cv2 import resize, threshold, THRESH_OTSU     # image processing
 from skimage import morphology, measure     # for lung masking
 from sklearn.cluster import KMeans          # for lung masking
 from tqdm import tqdm                       # for progress bars
+from scipy.ndimage import gaussian_filter   # for lungmasking
 
 def make_lungmask(img, display=False):
     '''
@@ -109,16 +110,17 @@ def make_lungmask(img, display=False):
     return masked_img, mask_var, n_labels
 
 
+# new method using otsu's thresholding
 def make_lungmask_v2(img):
 
-    # define new method using otsu's thresholding
+    mid_dict = {}
+
     row_size= img.shape[0]
     col_size = img.shape[1]
 
-    im_mean = np.mean(img)
-    std = np.std(img)
-    img = img-im_mean
-    img = img/std
+    # Rescale pixels to 255
+    img = img.astype(float)
+    #### need to get middle portion and normalize to it
     # Find the average pixel value near the lungs to renormalize washed out images.
     middle = img[int(col_size/5):int(col_size/5*4),int(row_size/5):int(row_size/5*4)] 
     im_mean = np.mean(middle)  
@@ -128,17 +130,20 @@ def make_lungmask_v2(img):
     img[img==im_max]=im_mean
     img[img==im_min]=im_mean
 
-    # Rescale pixels to 255
-    img_2d = img.astype(float)                            
-    im_min = np.min(img_2d) # many are not windowed and have vals < 0
+    im_min = np.min(img) # many are not windowed and have vals < 0
     if im_min < 0:
-        img_2d = img_2d - im_min
-    img = (np.maximum(img_2d,0) / img_2d.max()) * 255.0
+        img = img - im_min
+    img = (np.maximum(img,0) / img.max()) * 255.0
+
+    # EXPERIMENTAL
+    img = gaussian_filter(img, sigma=1)
 
     # otsu's binarization thresholding
     thresh, thresh_img = threshold(img.astype('uint8'), np.min(img), np.max(img), THRESH_OTSU)
     # rescale to binary and invert
     thresh_img = np.where(thresh_img==0,1,0)
+
+    mid_dict['thresholded'] = thresh_img
 
     ###########################################
 
@@ -147,7 +152,9 @@ def make_lungmask_v2(img):
     # First erode away the finer elements, then dilate to include some of the pixels surrounding the lung.  
     # We don't want to accidentally clip the lung.
     erosion = morphology.erosion(thresh_img,np.ones([3,3]))
-    dilation = morphology.dilation(erosion,np.ones([15,15]))
+    dilation = morphology.dilation(erosion,np.ones([13,13]))
+
+    mid_dict['morph'] = dilation
 
     labels = measure.label(dilation) # Different labels are displayed in different colors
     labels = labels + 1 # add 1 to every element so that the background is no longer encoded as 0
@@ -161,10 +168,10 @@ def make_lungmask_v2(img):
         # min row > 15%, max row < 85%
         # min col < 15%, max col < 85%
         # region area is > 0.1% of img
-        if B[2]-B[0]<row_size*.90 and \
-            B[3]-B[1]<col_size*.90 and \
-            B[0]>row_size*.075 and B[2]<row_size*.925 and \
-            B[1]>col_size*.075 and B[3]<col_size*925 and \
+        if B[2]-B[0]<row_size*.80 and \
+            B[3]-B[1]<col_size*.80 and \
+            B[0]>row_size*.05 and B[2]<row_size*.95 and \
+            B[1]>col_size*.05 and B[3]<col_size*.95 and \
             prop.area/n_px*100 > 0.1:
             good_labels.append(prop.label) 
             #print(f'prop {prop.label} area: {np.round(prop.area/n_px*100,2)}, {B}')
@@ -182,7 +189,7 @@ def make_lungmask_v2(img):
     mask_var = np.round(np.var(mask), 4)
     n_labels = len(good_labels)
 
-    return masked_img, mask_var, n_labels
+    return masked_img, mask_var, n_labels, mid_dict
 
 
 def process_data(patient, patient_history_df, img_px_size=32, hm_slices=8, verbose=False, data_dir="./data/train/"):
@@ -210,7 +217,7 @@ def process_data(patient, patient_history_df, img_px_size=32, hm_slices=8, verbo
     # lung masking
     masked_slices = []
     for each_slice in tqdm(slices):
-        masked_img, mask_var, n_labels = make_lungmask_v2(each_slice)
+        masked_img, mask_var, n_labels, _ = make_lungmask_v2(each_slice)
         # check and see if this slice is worth keeping (contains lungs, did a good job of masking them)
         if mask_var > .04 and n_labels < 10:
             masked_slices.append(masked_img)
