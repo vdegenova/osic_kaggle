@@ -45,6 +45,9 @@ def main():
         encoding_filepath = f"{working_dir}patient_ids_to_encodings_dict"
         output_filepath = "/Users/vdegenova/Projects/osic_kaggle/working/submission.csv"
 
+        preprocessed_training_npy = "/Users/vdegenova/Projects/osic_kaggle/working/158-images-with_ids-64-64-8-2020-09-01T21:35.npy"
+        preprocessed_test_npy = "/Users/vdegenova/Projects/osic_kaggle/working/5-images-with_ids-64-64-8-2020-09-01T21:35.npy"
+
     # overall program flow
     # 1. read in data                               (train and test)
     # 2. pre process data                           (train and test)
@@ -63,38 +66,38 @@ def main():
     ################################################
     # 1. read in data (train and test)
     ################################################
-    patient_training_data = read_in_data(
-        data_dir=training_dir,
-        img_px_size=img_px_size,
-        slice_count=slice_count,
-        verbose=True,
-        csv_file=training_csv_dir,
-    )
-    patient_test_data = read_in_data(
-        data_dir=test_dir,
-        img_px_size=img_px_size,
-        slice_count=slice_count,
-        verbose=True,
-        csv_file=test_csv_dir,
-    )
+    # patient_training_data = read_in_data(
+    #     data_dir=training_dir,
+    #     img_px_size=img_px_size,
+    #     slice_count=slice_count,
+    #     verbose=True,
+    #     csv_file=training_csv_dir,
+    # )
+    # patient_test_data = read_in_data(
+    #     data_dir=test_dir,
+    #     img_px_size=img_px_size,
+    #     slice_count=slice_count,
+    #     verbose=True,
+    #     csv_file=test_csv_dir,
+    # )
 
     ################################################
     # 2. pre process dicom data (train and test)
     ################################################
-    preprocessed_training_npy = save_to_disk(
-        patient_training_data,
-        img_px_size=img_px_size,
-        slice_count=slice_count,
-        working_dir=working_dir,
-    )
-    preprocessed_test_npy = save_to_disk(
-        patient_test_data,
-        img_px_size=img_px_size,
-        slice_count=slice_count,
-        working_dir=working_dir,
-    )
-    del patient_training_data
-    del patient_test_data
+    # preprocessed_training_npy = save_to_disk(
+    #     patient_training_data,
+    #     img_px_size=img_px_size,
+    #     slice_count=slice_count,
+    #     working_dir=working_dir,
+    # )
+    # preprocessed_test_npy = save_to_disk(
+    #     patient_test_data,
+    #     img_px_size=img_px_size,
+    #     slice_count=slice_count,
+    #     working_dir=working_dir,
+    # )
+    # del patient_training_data
+    # del patient_test_data
 
     ################################################
     # 3. train autoencoder (training data)
@@ -186,8 +189,27 @@ def main():
     # 6. generate predictions and confidence values (test data)
     ################################################
     # first preprocess the test data for the regressor models
-    all_test_data = load_pickled_encodings(testing_encoding_path, training_csv_dir)
-    X_test = all_test_data.drop(
+
+    all_test_data = load_pickled_encodings(testing_encoding_path, test_csv_dir)
+
+    min_weeks = -12
+    max_weeks = 133
+    weeks = list(range(min_weeks, max_weeks + 1, 1))
+
+    all_test_data = all_test_data.drop_duplicates(subset=["Patient"], keep="first")
+
+    total_df = pd.concat([all_test_data] * len(weeks))
+
+    new_weeks = []
+    n_test_patients = all_test_data.Patient.nunique()
+    for week in weeks:
+        this_week_duped = [week] * n_test_patients
+        new_weeks.extend(this_week_duped)
+
+    total_df["Weeks"] = new_weeks
+    full_test_data = total_df
+
+    X_test = full_test_data.drop(
         columns="FVC"
     )  # keep as a dataframe to pass to pipeline
 
@@ -198,7 +220,7 @@ def main():
 
     preds = infer(regressor, X_test)
     quantile_preds = infer(quantile_regressor, X_test)
-    patient_ids = np.asarray(all_test_data["Patient"])
+    patient_ids = np.asarray(full_test_data["Patient"])
 
     ################################################
     # 7. generate output file
@@ -207,14 +229,14 @@ def main():
     FVCs = []
     confidences = []
 
-    for patient, pred, patient_id, q_pred in zip(
-        X_test, preds, patient_ids, quantile_preds
+    for patient, pred, patient_id, q_pred, week in zip(
+        X_test, preds, patient_ids, quantile_preds, new_weeks
     ):
         # print(f"ID: {patient_id} Weeks: {patient[0]} Pred: {pred[0]}, Truth: {truth}")
-        patient_week = f"{patient_id}_{patient[0]}"
+        patient_week = f"{patient_id}_{week}"
         patient_weeks.append(patient_week)
-        FVCs.append(pred[0])
-        confidences.append(abs(q_pred[0] - pred[0]))
+        FVCs.append(int(pred[0]))
+        confidences.append(int(abs(q_pred[0] - pred[0])))
 
     results_df = pd.DataFrame(
         {"Patient_Week": patient_weeks, "FVC": FVCs, "Confidence": confidences}
