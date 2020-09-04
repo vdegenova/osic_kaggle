@@ -219,6 +219,7 @@ def save_to_disk(data, img_px_size=32, slice_count=8):
     filestring = f"./data/processed_data/{data.shape[0]}-images-with_ids-{img_px_size}-{img_px_size}-{slice_count}-{now}.npy"
     print(f"saving to {filestring}")
     np.save(filestring, data)
+    return filestring
 
 
 def main():
