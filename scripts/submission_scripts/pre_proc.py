@@ -15,16 +15,16 @@ from scipy.ndimage import gaussian_filter  # for lungmasking
 def find_interior_ind(arr):
     # helper function for find_interior_ind. find border
     border_val = arr[0]
-    borderless_start_ind = np.where(arr!=border_val)[0][0]
-    borderless_end_ind = np.where(arr!=border_val)[0][-1]
-    return borderless_start_ind+1, borderless_end_ind-1
+    borderless_start_ind = np.where(arr != border_val)[0][0]
+    borderless_end_ind = np.where(arr != border_val)[0][-1]
+    return borderless_start_ind + 1, borderless_end_ind - 1
 
 
 def custom_trim(im):
     # returns an image with its border removed, if there is one
     mid_inds = np.array(im.shape) // 2
-    middle_row = im[mid_inds[0],:]
-    middle_col = im[:,mid_inds[1]]
+    middle_row = im[mid_inds[0], :]
+    middle_col = im[:, mid_inds[1]]
     left, right = find_interior_ind(middle_row)
     top, bot = find_interior_ind(middle_col)
 
@@ -45,21 +45,21 @@ def transform_to_hu(img, rescale_slope, rescale_intercept):
     # convert ouside pixel-values to air:
     # I'm using <= -1000 to be sure that other defaults are captured as well
     img[img <= -1000] = 0
-    
+
     # convert to HU
     if rescale_slope != 1:
         img = rescale_slope * img.astype(np.float64)
         img = img.astype(np.int16)
-        
-    img += np.int16(rescale_intercept)
-    
+
+    img = np.add(img, rescale_intercept, casting="safe")
+
     return img
 
 
 def set_manual_window(hu_image, custom_center=-500, custom_width=1000):
     w_image = hu_image.copy()
-    min_value = custom_center - (custom_width/2)
-    max_value = custom_center + (custom_width/2)
+    min_value = custom_center - (custom_width / 2)
+    max_value = custom_center + (custom_width / 2)
     w_image[w_image < min_value] = min_value
     w_image[w_image > max_value] = max_value
     return w_image
@@ -70,18 +70,18 @@ def lung_mask(img, manual_threshold=320):
     # With -320 we are separating between lungs (-700) /air (-1000) and tissue with values close to water (0).
 
     blurred_img = gaussian_filter(img, sigma=1)
-    
-    binary_image = np.array(blurred_img > -manual_threshold, dtype=np.int8)+1
+
+    binary_image = np.array(blurred_img > -manual_threshold, dtype=np.int8) + 1
     manually_thresholded = binary_image.copy()
 
     labels = measure.label(binary_image)
-    
-    background_label_1 = labels[0,0]
-    background_label_2 = labels[0,-1]
-    background_label_3 = labels[-1,0]
-    background_label_4 = labels[-1,-1]
 
-    #Fill the air around the person
+    background_label_1 = labels[0, 0]
+    background_label_2 = labels[0, -1]
+    background_label_3 = labels[-1, 0]
+    background_label_4 = labels[-1, -1]
+
+    # Fill the air around the person
     binary_image[background_label_1 == labels] = 2
     binary_image[background_label_2 == labels] = 2
     binary_image[background_label_3 == labels] = 2
@@ -91,11 +91,11 @@ def lung_mask(img, manual_threshold=320):
     kernel = morphology.disk(4)
     binary_image = morphology.closing(binary_image, kernel)
 
-    binary_image -= 1 # Make the image actual binary
-    binary_image = 1-binary_image # Invert it, lungs are now 1
-    
+    binary_image -= 1  # Make the image actual binary
+    binary_image = 1 - binary_image  # Invert it, lungs are now 1
+
     masked_img = binary_image.copy() * img
-    
+
     return masked_img, manually_thresholded
 
 
@@ -110,9 +110,9 @@ def crop_and_resize(img, crop_factor, img_px_size):
 
 
 def resize_volume(slices, hm_slices, img_px_size):
-    '''
+    """
     takes in a list of slices, then resized it into a common depth
-    '''
+    """
     # try opencv.resize on a different axis
     slices = np.array(slices)
     # initialze resized array, then modify each slice along second axis
@@ -169,13 +169,17 @@ def process_patient(
         rescale_slope = dicom.RescaleSlope
 
         # rescale HU
-        hu_scaled_img = transform_to_hu(img=img, rescale_slope=rescale_slope, rescale_intercept=rescale_intercept)
+        hu_scaled_img = transform_to_hu(
+            img=img, rescale_slope=rescale_slope, rescale_intercept=rescale_intercept
+        )
         # window
         windowed_img = set_manual_window(hu_scaled_img)
         # mask slice
         masked_img, _ = lung_mask(windowed_img)
         # resize to common dimensions, optionally center crop
-        resized_img = crop_and_resize(masked_img, crop_factor=crop_factor, img_px_size=img_px_size)
+        resized_img = crop_and_resize(
+            masked_img, crop_factor=crop_factor, img_px_size=img_px_size
+        )
         # add finished image to list of slices
         slices.append(resized_img)
 
@@ -185,9 +189,7 @@ def process_patient(
     relevant_side_info = patient_history_df[["Patient", "Weeks", "FVC", "Percent"]]
 
     if verbose:
-        print(
-            f"Patient {patient}"
-        )
+        print(f"Patient {patient}")
 
     return resized_volume, relevant_side_info
 
@@ -246,16 +248,16 @@ def read_in_data(
     return np.array(all_the_data, dtype=object)
 
 
-def save_to_disk(data, img_px_size=32, slice_count=8):
+def save_to_disk(data, img_px_size=32, slice_count=8, working_dir="./working/"):
     now = datetime.datetime.now().isoformat(timespec="minutes")
-    filestring = f"./data/processed_data/{data.shape[0]}-images-with_ids-{img_px_size}-{img_px_size}-{slice_count}-{now}.npy"
+    filestring = f"{working_dir}{data.shape[0]}-images-with_ids-{img_px_size}-{img_px_size}-{slice_count}-{now}.npy"
     print(f"saving to {filestring}")
     np.save(filestring, data)
     return filestring
 
 
 def main():
-    LOCAL_RUN = True # set this to False for submission!
+    LOCAL_RUN = True  # set this to False for submission!
     img_px_size = 64
     slice_count = 8
     local_csv_path = "./data/train.csv"

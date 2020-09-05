@@ -67,18 +67,18 @@ def main():
     # 1. read in data (train and test)
     ################################################
     patient_training_data = read_in_data(
-        data_dir=training_dir,
+        patient_dir=training_dir,
         img_px_size=img_px_size,
         slice_count=slice_count,
         verbose=True,
-        csv_file=training_csv_dir,
+        csv_path=training_csv_dir,
     )
     patient_test_data = read_in_data(
-        data_dir=test_dir,
+        patient_dir=test_dir,
         img_px_size=img_px_size,
         slice_count=slice_count,
         verbose=True,
-        csv_file=test_csv_dir,
+        csv_path=test_csv_dir,
     )
 
     ################################################
