@@ -236,6 +236,7 @@ def read_in_data(
                 img_px_size=IMG_PX_SIZE,
                 hm_slices=SLICE_COUNT,
                 verbose=verbose,
+                data_dir=patient_dir,
             )
             patient_id = patient_history.Patient.iloc[0]
             all_the_data.append([img_data, patient_id])
