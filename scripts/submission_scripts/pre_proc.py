@@ -12,6 +12,34 @@ from tqdm import tqdm  # for progress bars
 from scipy.ndimage import gaussian_filter  # for lungmasking
 
 
+def find_interior_ind(arr):
+    # helper function for find_interior_ind. find border
+    border_val = arr[0]
+    borderless_start_ind = np.where(arr!=border_val)[0][0]
+    borderless_end_ind = np.where(arr!=border_val)[0][-1]
+    return borderless_start_ind+1, borderless_end_ind-1
+
+
+def custom_trim(im):
+    # returns an image with its border removed, if there is one
+    mid_inds = np.array(im.shape) // 2
+    middle_row = im[mid_inds[0],:]
+    middle_col = im[:,mid_inds[1]]
+    left, right = find_interior_ind(middle_row)
+    top, bot = find_interior_ind(middle_col)
+
+    # now, check if that entire column for left and right is monochrome
+    if len(np.unique(im[:left])) > 1:
+        left = 0
+    if len(np.unique(im[:right])) > 1:
+        right = 0
+    if len(np.unique(im[top:])) > 1:
+        top = 0
+    if len(np.unique(im[bot:])) > 1:
+        bot = 0
+    return im[top:bot, left:right]
+
+
 def transform_to_hu(img, rescale_slope, rescale_intercept):
 
     # convert ouside pixel-values to air:
@@ -40,8 +68,12 @@ def set_manual_window(hu_image, custom_center=-500, custom_width=1000):
 def lung_mask(img, manual_threshold=320):
     # Returns the masked portion of the image showing just the lungs
     # With -320 we are separating between lungs (-700) /air (-1000) and tissue with values close to water (0).
+
+    blurred_img = gaussian_filter(img, sigma=1)
     
-    binary_image = np.array(img > -manual_threshold, dtype=np.int8)+1
+    binary_image = np.array(blurred_img > -manual_threshold, dtype=np.int8)+1
+    manually_thresholded = binary_image.copy()
+
     labels = measure.label(binary_image)
     
     background_label_1 = labels[0,0]
@@ -64,7 +96,7 @@ def lung_mask(img, manual_threshold=320):
     
     masked_img = binary_image.copy() * img
     
-    return masked_img
+    return masked_img, manually_thresholded
 
 
 def crop_and_resize(img, crop_factor, img_px_size):
@@ -77,7 +109,7 @@ def crop_and_resize(img, crop_factor, img_px_size):
     return img
 
 
-def resize_volume(slices, hm_slices):
+def resize_volume(slices, hm_slices, img_px_size):
     '''
     takes in a list of slices, then resized it into a common depth
     '''
@@ -141,14 +173,14 @@ def process_patient(
         # window
         windowed_img = set_manual_window(hu_scaled_img)
         # mask slice
-        masked_img = lung_mask(windowed_img)
+        masked_img, _ = lung_mask(windowed_img)
         # resize to common dimensions, optionally center crop
         resized_img = crop_and_resize(masked_img, crop_factor=crop_factor, img_px_size=img_px_size)
         # add finished image to list of slices
         slices.append(resized_img)
 
     # combine all slices into a volume and reshape into common volume
-    resized_volume = resize_volume(slices, hm_slices)
+    resized_volume = resize_volume(slices, hm_slices, img_px_size)
 
     relevant_side_info = patient_history_df[["Patient", "Weeks", "FVC", "Percent"]]
 
