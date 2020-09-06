@@ -67,7 +67,8 @@ def set_manual_window(hu_image, custom_center=-500, custom_width=1000):
     return w_image
 
 
-def lung_mask(img, manual_threshold=320):
+def lung_mask(img, manual_threshold=320,
+    WIDTH_CRITERIA=.80, HEIGHT_CRITERIA=.80, HORIZ_BORDER_CRITERIA=.02, VERT_BORDER_CRITERIA=.05):
     # Returns the masked portion of the image showing just the lungs
     # With -320 we are separating between lungs (-700) /air (-1000) and tissue with values close to water (0).
 
@@ -89,16 +90,41 @@ def lung_mask(img, manual_threshold=320):
     binary_image[background_label_3 == labels] = 2
     binary_image[background_label_4 == labels] = 2
 
+    manually_filled = binary_image.copy()
+
     # Morph - closing =  dilation followed by erosion
     kernel = morphology.disk(4)
-    binary_image = morphology.closing(binary_image, kernel)
+    #binary_image = morphology.closing(binary_image, kernel)
+    binary_image = morphology.opening(binary_image, kernel)
 
     binary_image -= 1  # Make the image actual binary
     binary_image = 1 - binary_image  # Invert it, lungs are now 1
 
-    masked_img = binary_image.copy() * img
+    pre_experimental = binary_image.copy()
 
-    return masked_img, manually_thresholded
+    # experimental - region selection - manually set regions to 0 if they fail criteria
+    binary_labels = measure.label(binary_image)
+    regions = measure.regionprops(binary_labels) # ignores labels marked 0
+    
+    (row_size, col_size) = img.shape
+    for prop in regions:
+        B = prop.bbox # (min_row, min_col, max_row, max_col)
+        # region width > 80% of img
+        # region height > 80% of img
+        # min row < 5%, max row > 95%
+        # min col < 5%, max col > 95%
+        if B[2]-B[0]>row_size*HEIGHT_CRITERIA or \
+            B[3]-B[1]>col_size*WIDTH_CRITERIA or \
+            B[0]<row_size*VERT_BORDER_CRITERIA or B[2]>row_size*(1-VERT_BORDER_CRITERIA) or \
+            B[1]<col_size*HORIZ_BORDER_CRITERIA or B[3]>col_size*(1-HORIZ_BORDER_CRITERIA):
+            binary_image[prop.label==binary_labels] = 0
+        else:
+            binary_image[prop.label==binary_labels] = 1
+
+    masked_img = binary_image.copy() * img
+    # masked_img = binary_labels.copy() * img
+
+    return masked_img, manually_thresholded, manually_filled, binary_labels, pre_experimental
 
 
 def crop_and_resize(img, crop_factor, img_px_size):
@@ -177,13 +203,14 @@ def process_patient(
         # window
         windowed_img = set_manual_window(hu_scaled_img)
         # mask slice
-        masked_img, _ = lung_mask(windowed_img)
+        masked_img = lung_mask(windowed_img)
         # resize to common dimensions, optionally center crop
         resized_img = crop_and_resize(
             masked_img, crop_factor=crop_factor, img_px_size=img_px_size
         )
         # add finished image to list of slices
-        slices.append(resized_img)
+        if len(np.unique(masked_img)) > 1: # some images find no air in the chest and return a solid image
+            slices.append(resized_img)
 
     # combine all slices into a volume and reshape into common volume
     resized_volume = resize_volume(slices, hm_slices, img_px_size)
