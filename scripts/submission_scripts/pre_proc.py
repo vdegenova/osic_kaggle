@@ -30,13 +30,13 @@ def custom_trim(im):
 
     # now, check if that entire column for left and right is monochrome
     if len(np.unique(im[:left])) > 1:
-        left = 0
+        left = 0 
     if len(np.unique(im[:right])) > 1:
-        right = 0
+        right = im.shape[0]
     if len(np.unique(im[top:])) > 1:
         top = 0
     if len(np.unique(im[bot:])) > 1:
-        bot = 0
+        bot = im.shape[-1]
     return im[top:bot, left:right]
 
 
@@ -44,16 +44,18 @@ def transform_to_hu(img, rescale_slope, rescale_intercept):
 
     # convert ouside pixel-values to air:
     # I'm using <= -1000 to be sure that other defaults are captured as well
-    img[img <= -1000] = 0
+    hu_rescaled_img = img.copy()
+
+    hu_rescaled_img[hu_rescaled_img <= -1000] = 0
 
     # convert to HU
     if rescale_slope != 1:
-        img = rescale_slope * img.astype(np.float64)
-        img = img.astype(np.int16)
+        hu_rescaled_img = rescale_slope * hu_rescaled_img.astype(np.float64)
+        hu_rescaled_img = hu_rescaled_img.astype(np.int16)
 
-    img = np.add(img, rescale_intercept, casting="safe")
+    hu_rescaled_img = np.add(hu_rescaled_img, rescale_intercept, casting="safe")
 
-    return img
+    return hu_rescaled_img
 
 
 def set_manual_window(hu_image, custom_center=-500, custom_width=1000):
