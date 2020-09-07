@@ -17,7 +17,13 @@ def find_interior_ind(arr):
     border_val = arr[0]
     borderless_start_ind = np.where(arr != border_val)[0][0]
     borderless_end_ind = np.where(arr != border_val)[0][-1]
-    return borderless_start_ind + 1, borderless_end_ind - 1
+
+    # adjust
+    if borderless_start_ind!=0:
+        borderless_start_ind-=1
+    if borderless_end_ind!=len(arr)-1:
+        borderless_end_ind+=1
+    return borderless_start_ind, borderless_end_ind
 
 
 def custom_trim(im):
@@ -29,13 +35,13 @@ def custom_trim(im):
     top, bot = find_interior_ind(middle_col)
 
     # now, check if that entire column for left and right is monochrome
-    if len(np.unique(im[:left])) > 1:
+    if len(np.unique(im[:,left])) > 1:
         left = 0 
-    if len(np.unique(im[:right])) > 1:
+    if len(np.unique(im[:,right])) > 1:
         right = im.shape[0]
-    if len(np.unique(im[top:])) > 1:
+    if len(np.unique(im[top,:])) > 1:
         top = 0
-    if len(np.unique(im[bot:])) > 1:
+    if len(np.unique(im[bot,:])) > 1:
         bot = im.shape[-1]
     return im[top:bot, left:right]
 
@@ -196,6 +202,9 @@ def process_patient(
         rescale_intercept = dicom.RescaleIntercept
         rescale_slope = dicom.RescaleSlope
 
+        # remove border if there is one
+        img = custom_trim(img)
+
         # rescale HU
         hu_scaled_img = transform_to_hu(
             img=img, rescale_slope=rescale_slope, rescale_intercept=rescale_intercept
@@ -203,7 +212,7 @@ def process_patient(
         # window
         windowed_img = set_manual_window(hu_scaled_img)
         # mask slice
-        masked_img = lung_mask(windowed_img)
+        masked_img = lung_mask(windowed_img)[0] # lung mask returns helper arrays, only take the first one for the mask
         # resize to common dimensions, optionally center crop
         resized_img = crop_and_resize(
             masked_img, crop_factor=crop_factor, img_px_size=img_px_size
