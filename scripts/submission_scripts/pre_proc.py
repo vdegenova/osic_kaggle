@@ -303,6 +303,8 @@ def main():
     kaggle_csv_path = "/kaggle/input/osic-pulmonary-fibrosis-progression/train.csv"
     local_patient_dir = "./data/train/"
     kaggle_patient_dir = "./data/train/"
+    local_working_dir = "./data/processed_data/"
+    kaggle_working_dir = "./working/"
 
     patient_data = read_in_data(
         csv_path=local_csv_path if LOCAL_RUN else kaggle_csv_path,
@@ -311,7 +313,10 @@ def main():
         slice_count=slice_count,
         verbose=True,
     )
-    save_to_disk(patient_data, img_px_size=img_px_size, slice_count=slice_count)
+    save_to_disk(patient_data,
+        img_px_size=img_px_size,
+        slice_count=slice_count,
+        working_dir=local_working_dir if LOCAL_RUN else kaggle_working_dir)
 
 
 if __name__ == "__main__":
