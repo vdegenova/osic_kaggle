@@ -51,7 +51,17 @@ class myDataGenerator(keras.utils.Sequence):
         for i, ID in enumerate(list_IDs_temp):
             # Store sample
             greyscale_img = np.load(self.data_dir + ID + '.npy')
-            X[i,] = np.stack((greyscale_img,)*3, axis=-1) # here I am making 1 channel into 3 duplicate channels
+            try:
+                assert not np.any(np.isnan(greyscale_img))
+            except AssertionError as e:
+                print(e)
+                print(self.data_dir + ID + '.npy')
+                exit()
+                
+            if self.n_channels > 1:
+                X[i,] = np.stack((greyscale_img,)*self.n_channels, axis=-1) # here I am making 1 channel into x duplicate channels
+            else:
+                X[i,] = greyscale_img
 
             # Store class
             y[i] = self.labels[ID]

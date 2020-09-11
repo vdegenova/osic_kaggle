@@ -37,19 +37,24 @@ def build_wide_and_deep(
     RETURN
         model
     '''
+
+    # cast input to 3 channels
     inp = Input(shape=input_shape)
+    #inp = Conv2D(3, (3, 3), activation="relu", padding="same", input_shape=input_shape)(inp)
+
+    #base_input_shape = (input_shape[0], input_shape[1], 3)
     base = efn.EfficientNetB0(input_shape=input_shape, weights=weights, include_top=False)
     for layer in base.layers:
         layer.trainable = False
     
     x = base(inp)
     x = GlobalAveragePooling2D()(x)
-    x = Dense(1)(x)
+    x = Dense(1)(x) # activation defaults to linear
 
     model = Model(inp, x)
 
     # compile model
-    opt = Adam(learning_rate=1e-3)
+    opt = Adam(learning_rate=1e-5)
     loss = 'MSE'
     model.compile(optimizer=opt, loss=loss)
 
@@ -104,7 +109,7 @@ def main():
     model.fit(
         x=training_generator,
         epochs=2,
-        verbose=2,
+        verbose=1,
         validation_data=validation_generator
         )
 
