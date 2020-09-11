@@ -2,6 +2,8 @@
 # install efficientnet with `pip install -U efficientnet` :)
 import numpy as np
 import json
+import os
+import random
 from typing import Tuple
 import efficientnet.tfkeras as efn
 from tensorflow.keras import Model
@@ -9,6 +11,8 @@ from tensorflow.keras.layers import (
     Dense, Dropout, Activation, Flatten, Input, BatchNormalization, GlobalAveragePooling2D, Add, Conv2D, AveragePooling2D, 
     LeakyReLU, Concatenate
 )
+from tensorflow.keras.optimizers import Adam
+from myDataGenerator import myDataGenerator
 
 # https://kobiso.github.io/Computer-Vision-Leaderboard/imagenet.html
 # B0 expects 224x224
@@ -43,36 +47,66 @@ def build_wide_and_deep(
     x = Dense(1)(x)
 
     model = Model(inp, x)
+
+    # compile model
+    opt = Adam(learning_rate=1e-3)
+    loss = 'MSE'
+    model.compile(optimizer=opt, loss=loss)
+
     return model
 
 
-def load_masked_image_data(PATIENT_IMAGES_FILEPATH:str) -> dict:
-    print(f'reading {PATIENT_IMAGES_FILEPATH}')
-    with open(PATIENT_IMAGES_FILEPATH, 'r') as f:
-        data = json.load(f)
-    # anticipated structure is data[<patient_id>]=<nested list of image arrays>
-    # convert image arrays back into numpy
-    for key, val in data.items():
-        data[key] = np.array(val)
-    return data
+def load_training_dataset(LOCAL_PATIENT_MASKS_DIR:str, validation_split=0.7):
+    # converts a loaded data dict of masked images into a proper dataset for NN training
+    # https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
 
+    datagen_params = {
+        'dim': (224, 224),
+        'batch_size': 32,
+        'n_channels': 3,
+        'data_dir':LOCAL_PATIENT_MASKS_DIR
+    }
 
-def load_training_dataset():
-    pass
+    # get list of all images
+    images_list = [os.path.splitext(f)[0] for f in os.listdir(LOCAL_PATIENT_MASKS_DIR)]
+    patients_ids = list(set([p.split('_')[0] for p in images_list])) # unique patients, not used rn
+
+    # get partition and labels dicts for datagenerator class
+    partition = {} # {'train':[<ids>], 'validation':[<ids>]}
+    labels = {}    # {<id>:y_true, ...}
+
+    random.shuffle(images_list)
+    split_ind = int(np.floor(len(images_list)*validation_split))
+    partition['train'] = images_list[:split_ind]
+    partition['validation'] = images_list[split_ind:]
+    # for testing, just assign a random FVC for each image
+    for p in images_list:
+        labels[p] = random.randint(1000, 4000)
+
+    training_generator = myDataGenerator(partition['train'], labels, **datagen_params)
+    validation_generator = myDataGenerator(partition['validation'], labels, **datagen_params)
+    
+    return training_generator, validation_generator
+
 
 def main():
-    LOCAL_PATIENT_DIR = "./data/train/"
-    LOCAL_PATIENT_IMAGES_FILEPATH = "./data/processed_data/3-images-with_ids-224-224-None-2020-09-11T11:44.json"
+    LOCAL_PATIENT_TAB_DIR = "./data/train/"
+    LOCAL_PATIENT_MASKS_DIR = "./data/processed_data/patient_masks_224/"
 
-    # Load masked images
-    data = load_masked_image_data(PATIENT_IMAGES_FILEPATH=LOCAL_PATIENT_IMAGES_FILEPATH)
-    print(data['ID00196637202246668775836'].shape)
+    # Load masked images into datagenerators
+    training_generator, validation_generator = load_training_dataset(LOCAL_PATIENT_MASKS_DIR=LOCAL_PATIENT_MASKS_DIR)
 
     # lets just try predicting FVC from images alone
     model = build_wide_and_deep()
     model.summary()
 
-
+    # train model
+    model.fit(
+        x=training_generator,
+        epochs=2,
+        verbose=2,
+        validation_data=validation_generator
+        )
 
 if __name__ == '__main__':
     main()

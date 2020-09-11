@@ -13,6 +13,13 @@ from scipy.ndimage import gaussian_filter  # for lungmasking
 import json
 
 
+def normalize(data):
+    data_min = data.min()
+    data_max = data.max()
+    data = [(x - data_min) / (data_max - data_min) for x in data]
+    return np.array(data)
+
+
 def find_interior_ind(arr):
     # helper function for find_interior_ind. find border
     border_val = arr[0]
@@ -179,6 +186,7 @@ def process_patient(
     verbose=False,
     data_dir="./data/train/",
     crop_factor=0,
+    working_dir=None
     ):
     """
     Function to read in all of the DICOMS in a patient dir, condense arrays into aggregated chunks
@@ -221,9 +229,13 @@ def process_patient(
         resized_img = crop_and_resize(
             masked_img, crop_factor=crop_factor, img_px_size=img_px_size
         )
+
+        # normalize [0, 1]
+        resized_img_norm = normalize(resized_img
+        )
         # add finished image to list of slices
         if len(np.unique(masked_img)) > 1: # some images find no air in the chest and return a solid image
-            slices.append(resized_img)
+            slices.append(resized_img_norm)
 
     # combine all slices into a volume and reshape into common volume
     resized_volume = resize_volume(slices, hm_slices, img_px_size)
@@ -232,6 +244,15 @@ def process_patient(
 
     if verbose:
         print(f"Patient {patient}")
+
+    # save each slice as a npy array!
+    if True:
+        masked_dir = os.path.join(working_dir, 'patient_masks_224/')
+        if not os.path.exists(masked_dir):
+            os.makedirs(masked_dir))
+        for i in range(resized_volume.shape[0]):
+            filestring = f"{masked_dir}{patient}_{i}.npy"
+            np.save(filestring, resized_volume[i,:,:].astype(dtype=np.float32))
 
     return resized_volume, relevant_side_info
 
@@ -242,7 +263,8 @@ def read_in_data(
     img_px_size=32,
     slice_count=8,
     verbose=False,
-    SAVE_MASKING_DICT=False
+    SAVE_MASKING_DICT=False,
+    working_dir=None
     ):
     """
     Function to ___
@@ -265,7 +287,7 @@ def read_in_data(
     error_log = []
     all_the_data = {} if SAVE_MASKING_DICT else []
 
-    for num, patient in enumerate(patients):
+    for num, patient in enumerate(patients[:]):
         if num % 10 == 0:
             print("Patient:" + str(num))
         patient_history_df = train_df[train_df.Patient == patient].sort_values(
@@ -280,6 +302,7 @@ def read_in_data(
                 hm_slices=SLICE_COUNT,
                 verbose=verbose,
                 data_dir=patient_dir,
+                working_dir=working_dir
             )
             patient_id = patient_history.Patient.iloc[0]
             if SAVE_MASKING_DICT:
@@ -331,12 +354,13 @@ def main():
         slice_count=slice_count,
         verbose=True,
         SAVE_MASKING_DICT=SAVE_MASKING_DICT,
+        working_dir=local_working_dir
     )
-    save_to_disk(patient_data,
-        img_px_size=img_px_size,
-        slice_count=slice_count,
-        working_dir=local_working_dir if LOCAL_RUN else kaggle_working_dir,
-        SAVE_MASKING_DICT=SAVE_MASKING_DICT)
+    # save_to_disk(patient_data,
+    #     img_px_size=img_px_size,
+    #     slice_count=slice_count,
+    #     working_dir=local_working_dir if LOCAL_RUN else kaggle_working_dir,
+    #     SAVE_MASKING_DICT=SAVE_MASKING_DICT)
 
 
 if __name__ == "__main__":
