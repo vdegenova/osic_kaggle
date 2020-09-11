@@ -10,6 +10,7 @@ from skimage import morphology, measure  # for lung masking
 from sklearn.cluster import KMeans  # for lung masking
 from tqdm import tqdm  # for progress bars
 from scipy.ndimage import gaussian_filter  # for lungmasking
+import json
 
 
 def find_interior_ind(arr):
@@ -149,20 +150,23 @@ def resize_volume(slices, hm_slices, img_px_size):
     """
     # try opencv.resize on a different axis
     slices = np.array(slices)
-    # initialze resized array, then modify each slice along second axis
-    resized_slices = np.zeros(
-        shape=(hm_slices, img_px_size, img_px_size)
-    )  # (8, 64, 64)
-    for i in range(resized_slices.shape[1]):
-        resized_slices[:, i, :] = resize(slices[:, i, :], (img_px_size, hm_slices))
-        # interpolation methods are: (https://www.tutorialkart.com/opencv/python/opencv-python-resize-image/)
-        # INTER_NEAREST – a nearest-neighbor interpolation
-        # INTER_LINEAR – a bilinear interpolation (used by default)
-        # INTER_AREA – resampling using pixel area relation.
-        #   It may be a preferred method for image decimation, as it gives moire’-free results.
-        #   But when the image is zoomed, it is similar to the INTER_NEAREST method.
-        # INTER_CUBIC – a bicubic interpolation over 4×4 pixel neighborhood
-        # INTER_LANCZOS4 – a Lanczos interpolation over 8×8 pixel neighborhood
+    if hm_slices:
+        # initialze resized array, then modify each slice along second axis
+        resized_slices = np.zeros(
+            shape=(hm_slices, img_px_size, img_px_size)
+        )  # (8, 64, 64)
+        for i in range(resized_slices.shape[1]):
+            resized_slices[:, i, :] = resize(slices[:, i, :], (img_px_size, hm_slices))
+            # interpolation methods are: (https://www.tutorialkart.com/opencv/python/opencv-python-resize-image/)
+            # INTER_NEAREST – a nearest-neighbor interpolation
+            # INTER_LINEAR – a bilinear interpolation (used by default)
+            # INTER_AREA – resampling using pixel area relation.
+            #   It may be a preferred method for image decimation, as it gives moire’-free results.
+            #   But when the image is zoomed, it is similar to the INTER_NEAREST method.
+            # INTER_CUBIC – a bicubic interpolation over 4×4 pixel neighborhood
+            # INTER_LANCZOS4 – a Lanczos interpolation over 8×8 pixel neighborhood
+    else:
+        resized_slices = slices
 
     return resized_slices
 
@@ -175,7 +179,7 @@ def process_patient(
     verbose=False,
     data_dir="./data/train/",
     crop_factor=0,
-):
+    ):
     """
     Function to read in all of the DICOMS in a patient dir, condense arrays into aggregated chunks
     INPUTS:
@@ -238,7 +242,8 @@ def read_in_data(
     img_px_size=32,
     slice_count=8,
     verbose=False,
-):
+    SAVE_MASKING_DICT=False
+    ):
     """
     Function to ___
     INPUTS:
@@ -258,7 +263,7 @@ def read_in_data(
     SLICE_COUNT = slice_count
 
     error_log = []
-    all_the_data = []
+    all_the_data = {} if SAVE_MASKING_DICT else []
 
     for num, patient in enumerate(patients):
         if num % 10 == 0:
@@ -277,28 +282,41 @@ def read_in_data(
                 data_dir=patient_dir,
             )
             patient_id = patient_history.Patient.iloc[0]
-            all_the_data.append([img_data, patient_id])
+            if SAVE_MASKING_DICT:
+                all_the_data[patient_id] = img_data
+            else:
+                all_the_data.append([img_data, patient_id])
 
         except Exception as e:
             print(patient, e)
             error_log.append((patient, e))
             continue
 
-    return np.array(all_the_data, dtype=object)
+    return all_the_data if SAVE_MASKING_DICT else np.array(all_the_data, dtype=object)
 
 
-def save_to_disk(data, img_px_size=32, slice_count=8, working_dir="./working/"):
+def save_to_disk(data, img_px_size=32, slice_count=8, working_dir="./working/", SAVE_MASKING_DICT=False):
     now = datetime.datetime.now().isoformat(timespec="minutes")
-    filestring = f"{working_dir}{data.shape[0]}-images-with_ids-{img_px_size}-{img_px_size}-{slice_count}-{now}.npy"
-    print(f"saving to {filestring}")
-    np.save(filestring, data)
+    if SAVE_MASKING_DICT:
+        filestring = f"{working_dir}{len(data.keys())}-images-with_ids-{img_px_size}-{img_px_size}-{slice_count}-{now}.json"
+        print(f"saving to {filestring}")
+        for key, val in data.items():
+            data[key] = val.tolist() # to reconvert, can just do np.array
+        with open(filestring, 'w') as f:
+            json.dump(data, f)
+    else:
+        filestring = f"{working_dir}{data.shape[0]}-images-with_ids-{img_px_size}-{img_px_size}-{slice_count}-{now}.npy"
+        print(f"saving to {filestring}")
+        np.save(filestring, data)
+
     return filestring
 
 
 def main():
     LOCAL_RUN = True  # set this to False for submission!
-    img_px_size = 64
-    slice_count = 8
+    SAVE_MASKING_DICT = True # set this as true to save a {patient:masks} json instead
+    img_px_size = 224
+    slice_count = None
     local_csv_path = "./data/train.csv"
     kaggle_csv_path = "/kaggle/input/osic-pulmonary-fibrosis-progression/train.csv"
     local_patient_dir = "./data/train/"
@@ -312,11 +330,13 @@ def main():
         img_px_size=img_px_size,
         slice_count=slice_count,
         verbose=True,
+        SAVE_MASKING_DICT=SAVE_MASKING_DICT,
     )
     save_to_disk(patient_data,
         img_px_size=img_px_size,
         slice_count=slice_count,
-        working_dir=local_working_dir if LOCAL_RUN else kaggle_working_dir)
+        working_dir=local_working_dir if LOCAL_RUN else kaggle_working_dir,
+        SAVE_MASKING_DICT=SAVE_MASKING_DICT)
 
 
 if __name__ == "__main__":
