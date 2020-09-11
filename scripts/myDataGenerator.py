@@ -54,10 +54,9 @@ class myDataGenerator(keras.utils.Sequence):
             try:
                 assert not np.any(np.isnan(greyscale_img))
             except AssertionError as e:
-                print(e)
-                print(self.data_dir + ID + '.npy')
-                exit()
-                
+                e.args += ('###############', ID, '###############')
+                raise
+
             if self.n_channels > 1:
                 X[i,] = np.stack((greyscale_img,)*self.n_channels, axis=-1) # here I am making 1 channel into x duplicate channels
             else:

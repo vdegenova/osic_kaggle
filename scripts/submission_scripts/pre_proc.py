@@ -14,6 +14,8 @@ import json
 
 
 def normalize(data):
+    if np.any(np.isnan(data)) or np.any(np.isinf(data)):
+        return None
     data_min = data.min()
     data_max = data.max()
     data = [(x - data_min) / (data_max - data_min) for x in data]
@@ -208,7 +210,8 @@ def process_patient(
     )  # sorts DICOMS by caudial (ass) to cranial (head)
 
     slices = []
-    for dicom in tqdm(dicoms):
+     # enumerate doesnt work with tqdm
+    for i, dicom in enumerate(tqdm(dicoms)):
         # grab information from dicoms for later
         img = dicom.pixel_array
         rescale_intercept = dicom.RescaleIntercept
@@ -231,11 +234,15 @@ def process_patient(
         )
 
         # normalize [0, 1]
-        resized_img_norm = normalize(resized_img
-        )
+        resized_img_norm = normalize(resized_img)
         # add finished image to list of slices
-        if len(np.unique(masked_img)) > 1: # some images find no air in the chest and return a solid image
+        if len(np.unique(resized_img_norm)) > 1 and \
+            not np.any(np.isnan(resized_img_norm)) and \
+            not np.any(np.isinf(resized_img_norm)) and \
+            not resized_img_norm is None: # some images find no air in the chest and return a solid image
             slices.append(resized_img_norm)
+        else:
+            print(f'encountered invald results in {patient}, {i+1}')
 
     # combine all slices into a volume and reshape into common volume
     resized_volume = resize_volume(slices, hm_slices, img_px_size)
@@ -249,7 +256,7 @@ def process_patient(
     if True:
         masked_dir = os.path.join(working_dir, 'patient_masks_224/')
         if not os.path.exists(masked_dir):
-            os.makedirs(masked_dir))
+            os.makedirs(masked_dir)
         for i in range(resized_volume.shape[0]):
             filestring = f"{masked_dir}{patient}_{i}.npy"
             np.save(filestring, resized_volume[i,:,:].astype(dtype=np.float32))
