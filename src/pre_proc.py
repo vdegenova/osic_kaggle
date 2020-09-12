@@ -188,7 +188,8 @@ def process_patient(
     verbose=False,
     data_dir="./data/train/",
     crop_factor=0,
-    working_dir=None
+    working_dir=None,
+    SAVE_SLICE_MASKS=False,
     ):
     """
     Function to read in all of the DICOMS in a patient dir, condense arrays into aggregated chunks
@@ -253,8 +254,8 @@ def process_patient(
         print(f"Patient {patient}")
 
     # save each slice as a npy array!
-    if True:
-        masked_dir = os.path.join(working_dir, 'patient_masks_224/')
+    if SAVE_SLICE_MASKS:
+        masked_dir = os.path.join(working_dir, f'patient_masks_{img_px_size}/')
         if not os.path.exists(masked_dir):
             os.makedirs(masked_dir)
         for i in range(resized_volume.shape[0]):
@@ -270,7 +271,9 @@ def read_in_data(
     img_px_size=32,
     slice_count=8,
     verbose=False,
+    SAVE_PATIENT_VOLUMES=False,
     SAVE_MASKING_DICT=False,
+    SAVE_SLICE_MASKS=False,
     working_dir=None
     ):
     """
@@ -292,7 +295,8 @@ def read_in_data(
     SLICE_COUNT = slice_count
 
     error_log = []
-    all_the_data = {} if SAVE_MASKING_DICT else []
+    patient_volumes = []
+    patient_masking_dict = {}
 
     for num, patient in enumerate(patients[:]):
         if num % 10 == 0:
@@ -309,44 +313,60 @@ def read_in_data(
                 hm_slices=SLICE_COUNT,
                 verbose=verbose,
                 data_dir=patient_dir,
-                working_dir=working_dir
+                working_dir=working_dir,
+                SAVE_SLICE_MASKS=SAVE_SLICE_MASKS,
             )
             patient_id = patient_history.Patient.iloc[0]
             if SAVE_MASKING_DICT:
-                all_the_data[patient_id] = img_data
-            else:
-                all_the_data.append([img_data, patient_id])
+                patient_masking_dict[patient_id] = img_data
+            if SAVE_PATIENT_VOLUMES:
+                patient_volumes.append([img_data, patient_id])
 
         except Exception as e:
             print(patient, e)
             error_log.append((patient, e))
             continue
 
-    return all_the_data if SAVE_MASKING_DICT else np.array(all_the_data, dtype=object)
+    return patient_masking_dict, np.array(patient_volumes, dtype=object)
 
 
-def save_to_disk(data, img_px_size=32, slice_count=8, working_dir="./working/", SAVE_MASKING_DICT=False):
+def save_to_disk(patient_volumes=None,
+    patient_masking_dict=None,
+    img_px_size=32,
+    slice_count=8,
+    working_dir="./working/",
+    SAVE_PATIENT_VOLUMES=False,
+    SAVE_MASKING_DICT=False,
+    SAVE_SLICE_MASKS=False,
+    ):
+
     now = datetime.datetime.now().isoformat(timespec="minutes")
-    if SAVE_MASKING_DICT:
-        filestring = f"{working_dir}{len(data.keys())}-images-with_ids-{img_px_size}-{img_px_size}-{slice_count}-{now}.json"
-        print(f"saving to {filestring}")
-        for key, val in data.items():
-            data[key] = val.tolist() # to reconvert, can just do np.array
-        with open(filestring, 'w') as f:
-            json.dump(data, f)
-    else:
-        filestring = f"{working_dir}{data.shape[0]}-images-with_ids-{img_px_size}-{img_px_size}-{slice_count}-{now}.npy"
-        print(f"saving to {filestring}")
-        np.save(filestring, data)
 
-    return filestring
+    if SAVE_MASKING_DICT:
+        filestring = f"{working_dir}{len(patient_masking_dict.keys())}-images-with_ids-{img_px_size}-{img_px_size}-{slice_count}-{now}.json"
+        print(f"saving to {filestring}")
+        for key, val in patient_masking_dict.items():
+            patient_masking_dict[key] = val.tolist() # np.arrays are not serializable. To reconvert, can just do np.array()
+        with open(filestring, 'w') as f:
+            json.dump(patient_masking_dict, f)
+
+    if SAVE_PATIENT_VOLUMES:
+        filestring = f"{working_dir}{patient_volumes.shape[0]}-images-with_ids-{img_px_size}-{img_px_size}-{slice_count}-{now}.npy"
+        print(f"saving to {filestring}")
+        np.save(filestring, patient_volumes)
+
+    return
 
 
 def main():
-    LOCAL_RUN = True  # set this to False for submission!
-    SAVE_MASKING_DICT = True # set this as true to save a {patient:masks} json instead
+    LOCAL_RUN = True                # set this to False for submission!
+    SAVE_PATIENT_VOLUMES = False    # Save a volume for each patient - generates 1 .npy file
+    SAVE_MASKING_DICT = False       # Save a {patient:masks} json - generates 1 .json file
+    SAVE_SLICE_MASKS = True         # Save a slice mask for each slice - generates 32,000 .npy files
+
     img_px_size = 224
-    slice_count = None
+    slice_count = None              # setting to None will not resize slices in z
+
     local_csv_path = "./data/train.csv"
     kaggle_csv_path = "/kaggle/input/osic-pulmonary-fibrosis-progression/train.csv"
     local_patient_dir = "./data/train/"
@@ -354,20 +374,26 @@ def main():
     local_working_dir = "./data/processed_data/"
     kaggle_working_dir = "./working/"
 
-    patient_data = read_in_data(
+    patient_volumes, patient_masking_dict = read_in_data(
         csv_path=local_csv_path if LOCAL_RUN else kaggle_csv_path,
         patient_dir=local_patient_dir if LOCAL_RUN else kaggle_patient_dir,
         img_px_size=img_px_size,
         slice_count=slice_count,
         verbose=True,
+        SAVE_PATIENT_VOLUMES=SAVE_PATIENT_VOLUMES,
         SAVE_MASKING_DICT=SAVE_MASKING_DICT,
+        SAVE_SLICE_MASKS=SAVE_SLICE_MASKS,
         working_dir=local_working_dir
     )
-    # save_to_disk(patient_data,
-    #     img_px_size=img_px_size,
-    #     slice_count=slice_count,
-    #     working_dir=local_working_dir if LOCAL_RUN else kaggle_working_dir,
-    #     SAVE_MASKING_DICT=SAVE_MASKING_DICT)
+
+    save_to_disk(patient_volumes=patient_volumes,
+        patient_masking_dict=patient_masking_dict,
+        img_px_size=img_px_size,
+        slice_count=slice_count,
+        working_dir=local_working_dir if LOCAL_RUN else kaggle_working_dir,
+        SAVE_PATIENT_VOLUMES=SAVE_PATIENT_VOLUMES,
+        SAVE_MASKING_DICT=SAVE_MASKING_DICT,
+        SAVE_SLICE_MASKS=SAVE_SLICE_MASKS,)
 
 
 if __name__ == "__main__":
