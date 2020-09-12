@@ -362,7 +362,7 @@ def main():
     LOCAL_RUN = True                # set this to False for submission!
     SAVE_PATIENT_VOLUMES = False    # Save a volume for each patient - generates 1 .npy file
     SAVE_MASKING_DICT = False       # Save a {patient:masks} json - generates 1 .json file
-    SAVE_SLICE_MASKS = True         # Save a slice mask for each slice - generates 32,000 .npy files
+    SAVE_SLICE_MASKS = True         # Save a slice mask for each slice - generates 32,000 .npy files in <working_dir>/patient_masks_<im_px_size>/
 
     img_px_size = 224
     slice_count = None              # setting to None will not resize slices in z
