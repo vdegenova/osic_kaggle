@@ -8,7 +8,7 @@ Team Bondi Boiz repo for the [OSIC Kaggle Challenge](https://www.kaggle.com/c/os
 ├── data                   # Given & generated data files - DICOM files are git-ignored
 ├── notebooks              # Jupyter Notebooks for EDA
 ├── src                    # Source files for competition model (.py)
-├── scripts                # Experiemtnal and helper scripts
+├── scripts                # Experimental and helper scripts
 ├── requirements.txt  
 └── README.md
 ```
