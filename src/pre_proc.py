@@ -29,10 +29,10 @@ def find_interior_ind(arr):
     borderless_end_ind = np.where(arr != border_val)[0][-1]
 
     # adjust
-    if borderless_start_ind!=0:
-        borderless_start_ind-=1
-    if borderless_end_ind!=len(arr)-1:
-        borderless_end_ind+=1
+    if borderless_start_ind != 0:
+        borderless_start_ind -= 1
+    if borderless_end_ind != len(arr) - 1:
+        borderless_end_ind += 1
     return borderless_start_ind, borderless_end_ind
 
 
@@ -45,13 +45,13 @@ def custom_trim(im):
     top, bot = find_interior_ind(middle_col)
 
     # now, check if that entire column for left and right is monochrome
-    if len(np.unique(im[:,left])) > 1:
+    if len(np.unique(im[:, left])) > 1:
         left = 0 
-    if len(np.unique(im[:,right])) > 1:
+    if len(np.unique(im[:, right])) > 1:
         right = im.shape[0]
-    if len(np.unique(im[top,:])) > 1:
+    if len(np.unique(im[top, :])) > 1:
         top = 0
-    if len(np.unique(im[bot,:])) > 1:
+    if len(np.unique(im[bot, :])) > 1:
         bot = im.shape[-1]
     return im[top:bot, left:right]
 
