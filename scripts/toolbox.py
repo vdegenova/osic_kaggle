@@ -61,7 +61,7 @@ def get_patient_dicoms(dicom_path, patient_ids=None, sort_slices=True):
 
     return patient_dicoms
 
-def score_prediction(real, pred, conf, min_conf=70, max_conf=1000)
+def score_prediction(real, pred, conf, min_conf=70, max_err=1000)
     """Returns the bounded Laplace log likelihood based on prediction error and confidence
     
     :param real: The real value of the data
@@ -72,13 +72,12 @@ def score_prediction(real, pred, conf, min_conf=70, max_conf=1000)
     :type conf: float, required
     :param min_conf: The lower bound of prediction confidence; represents min possible error
     :type min_conf: float, optional
-    :param max_conf: The upper bound of prediction confidence; represents max possible error,
-         to limit scoring penalty
-    :type max_conf: float, optional
+    :param max_err: The upper bound of prediction error to limit scoring penalty
+    :type max_err: float, optional
     :return: The LaPlace Log Likelihood based on prediction error and the bounded confidence
     :rtype: float
     """
     # Clipping defaults provided by competiton
-    bounded_conf = np.minimum(conf, 70)
-    bounded_err = np.maximum(np.abs(real - pred), 1000)
+    bounded_conf = np.maximum(conf, min_conf)
+    bounded_err = np.minimum(np.abs(real - pred), max_err)
     return -(np.sqrt(2) * bounded_err / bounded_conf) - np.log(np.sqrt(2) * bounded_conf)
