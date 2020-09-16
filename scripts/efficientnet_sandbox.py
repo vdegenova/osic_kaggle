@@ -4,15 +4,21 @@ import numpy as np
 import json
 import os
 import random
+import pandas as pd
 from typing import Tuple
 import efficientnet.tfkeras as efn
 from tensorflow.keras import Model
 from tensorflow.keras.layers import (
     Dense, Dropout, Activation, Flatten, Input, BatchNormalization, GlobalAveragePooling2D, Add, Conv2D, AveragePooling2D, 
-    LeakyReLU, Concatenate
-)
+    LeakyReLU, Concatenate)
 from tensorflow.keras.optimizers import Adam
 from myDataGenerator import myDataGenerator
+import sys
+sys.path.append('./src/')
+from pipelines import (
+    get_pipeline_selectors,
+    get_postproc_pipeline,
+    load_pickled_encodings,)
 
 # https://kobiso.github.io/Computer-Vision-Leaderboard/imagenet.html
 # B0 expects 224x224
@@ -22,7 +28,7 @@ from myDataGenerator import myDataGenerator
 # B4 expects 380x380
 # B5 expects 456x456
 # B6 expects 528x528
-# B6 expects 600x600
+# B7 expects 600x600
 
 def build_wide_and_deep(
     input_shape:Tuple[int,int,int]=(224,224,3),
@@ -61,7 +67,8 @@ def build_wide_and_deep(
     return model
 
 
-def load_training_dataset(LOCAL_PATIENT_MASKS_DIR:str, validation_split=0.7):
+def load_training_dataset(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_PATH:str,
+    validation_split=0.7):
     # converts a loaded data dict of masked images into a proper dataset for NN training
     # https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
 
@@ -72,34 +79,58 @@ def load_training_dataset(LOCAL_PATIENT_MASKS_DIR:str, validation_split=0.7):
         'data_dir':LOCAL_PATIENT_MASKS_DIR
     }
 
-    # get list of all images
-    images_list = [os.path.splitext(f)[0] for f in os.listdir(LOCAL_PATIENT_MASKS_DIR)]
-    patients_ids = list(set([p.split('_')[0] for p in images_list])) # unique patients, not used rn
+    # modify patient dataframe to create unique identifiers for each patient
+    patient_df = pd.read_csv(LOCAL_PATIENT_TAB_PATH)
+    patient_df['unique_id'] = patient_df['Patient'] + '___' + patient_df['Weeks'].astype(str)
+    patient_keys = patient_df['unique_id'].unique().tolist() # like ID00007637202177411956430___7
+
+    # # get list of all images
+    # images_list = [os.path.splitext(f)[0] for f in os.listdir(LOCAL_PATIENT_MASKS_DIR)]
+    # patients_ids = list(set([p.split('_')[0] for p in images_list])) # unique patients, not used rn
 
     # get partition and labels dicts for datagenerator class
     partition = {} # {'train':[<ids>], 'validation':[<ids>]}
     labels = {}    # {<id>:y_true, ...}
 
-    random.shuffle(images_list)
-    split_ind = int(np.floor(len(images_list)*validation_split))
-    partition['train'] = images_list[:split_ind]
-    partition['validation'] = images_list[split_ind:]
-    # for testing, just assign a random FVC for each image
-    for p in images_list:
-        labels[p] = random.randint(1000, 4000)
+    # Assign train/validation keys
+    random.shuffle(patient_keys)
+    split_ind = int(np.floor(len(patient_keys)*validation_split))
+    partition['train'] = patient_keys[:split_ind]
+    partition['validation'] = patient_keys[split_ind:]
+    # assign labels
+    for kv in patient_df[['unique_id','FVC']].values: # [key, val]
+        labels[kv[0]] = kv[1]
 
-    training_generator = myDataGenerator(partition['train'], labels, **datagen_params)
-    validation_generator = myDataGenerator(partition['validation'], labels, **datagen_params)
+    # create internal dictionary for DataGenerators to use for processed tabular data
+    tab_data = {} # {<id>: np.array(<encoded tabular data>)}
+    no_op_attrs, num_attrs, cat_attrs, encoded_attrs = get_pipeline_selectors()
+    pipeline = get_postproc_pipeline(
+        no_op_attrs, num_attrs, cat_attrs, encoded_attrs)
+    X = pipeline.fit_transform(patient_df).toarray()
+    for unique_id, arr in zip(patient_df['unique_id'].values, X): # [key, val]
+        tab_data[unique_id] = arr
+
+    training_generator = myDataGenerator(list_ids=partition['train'],
+        labels=labels,
+        tab_data=tab_data,
+        **datagen_params)
+    validation_generator = myDataGenerator(list_ids=partition['validation'],
+        labels=labels,
+        tab_data=tab_data,
+        **datagen_params)
     
     return training_generator, validation_generator
 
 
 def main():
-    LOCAL_PATIENT_TAB_DIR = "./data/train/"
+    LOCAL_PATIENT_TAB_PATH = "./data/train.csv"
     LOCAL_PATIENT_MASKS_DIR = "./data/processed_data/patient_masks_224/"
 
     # Load masked images into datagenerators
-    training_generator, validation_generator = load_training_dataset(LOCAL_PATIENT_MASKS_DIR=LOCAL_PATIENT_MASKS_DIR)
+    training_generator, validation_generator = load_training_dataset(
+        LOCAL_PATIENT_MASKS_DIR=LOCAL_PATIENT_MASKS_DIR,
+        LOCAL_PATIENT_TAB_PATH=LOCAL_PATIENT_TAB_PATH
+    )
 
     # lets just try predicting FVC from images alone
     model = build_wide_and_deep()

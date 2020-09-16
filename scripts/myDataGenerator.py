@@ -1,13 +1,15 @@
 from tensorflow import keras
 import numpy as np
+import pandas as pd
+
 
 class myDataGenerator(keras.utils.Sequence):
     '''
     Generates data for keras
     # https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
     '''
-    def __init__(self, list_IDs, labels, data_dir, batch_size=32, dim=(32,32,32), n_channels=1,
-                n_classes=None, shuffle=True):
+    def __init__(self, list_IDs, labels, data_dir, tab_data, batch_size=32, dim=(224,224,3), n_channels=1,
+                 n_classes=None, shuffle=True):
         self.dim = dim
         self.batch_size = batch_size
         self.labels = labels
@@ -16,12 +18,14 @@ class myDataGenerator(keras.utils.Sequence):
         self.n_channels = n_channels
         self.n_classes = n_classes
         self.shuffle = shuffle
+        self.tab_data = tab_data
         self.on_epoch_end()
 
     def __len__(self):
         '''Denotes the number of batches per epoch'''
         return int(np.floor(len(self.list_IDs) / self.batch_size))
     
+
     def __getitem__(self, index):
         '''Generate one batch of data'''
         # Generate indexes of the batch
@@ -35,27 +39,34 @@ class myDataGenerator(keras.utils.Sequence):
 
         return X, y
 
+
     def on_epoch_end(self):
         '''Updates indexes after each epoch'''
         self.indexes = np.arange(len(self.list_IDs))
         if self.shuffle == True:
             np.random.shuffle(self.indexes)
 
+
     def __data_generation(self, list_IDs_temp):
         '''Generates data containing batch_size samples''' # X : (n_samples, *dim, n_channels)
+        # each item of X needs to be a tuple. The first item can be the image, the second must be tabular
         # Initialization
-        X = np.empty((self.batch_size, *self.dim, self.n_channels))
+        x_imgs = np.empty((self.batch_size, *self.dim, self.n_channels))
+        x_tab = np.empty((self.batch_size))
         y = np.empty((self.batch_size), dtype=int)
 
         # Generate data
         for i, ID in enumerate(list_IDs_temp):
-            # Store sample
+            # get image data
             greyscale_img = np.load(self.data_dir + ID + '.npy')
             try:
                 assert not np.any(np.isnan(greyscale_img))
             except AssertionError as e:
                 e.args += ('###############', ID, '###############')
                 raise
+            
+            # get tabular data
+            #raw_tab = self.patient_df.loc[]
 
             if self.n_channels > 1:
                 X[i,] = np.stack((greyscale_img,)*self.n_channels, axis=-1) # here I am making 1 channel into x duplicate channels
