@@ -31,8 +31,9 @@ from pipelines import (
 # B7 expects 600x600
 
 def build_wide_and_deep(
-    input_shape:Tuple[int,int,int]=(224,224,3),
+    img_input_shape:Tuple[int,int,int]=(224,224,3),
     weights='noisy-student',
+    tab_input_shape:Tuple[int,]=(7,),
     ):
     '''
     Builds a wide and deep model by concatenating a base efficientnet model --with a vector of tabular data
@@ -44,20 +45,21 @@ def build_wide_and_deep(
         model
     '''
 
-    # cast input to 3 channels
-    inp = Input(shape=input_shape)
-    #inp = Conv2D(3, (3, 3), activation="relu", padding="same", input_shape=input_shape)(inp)
-
-    #base_input_shape = (input_shape[0], input_shape[1], 3)
-    base = efn.EfficientNetB0(input_shape=input_shape, weights=weights, include_top=False)
+    # Create Deep leg
+    inp_img = Input(shape=img_input_shape)
+    base = efn.EfficientNetB0(input_shape=img_input_shape, weights=weights, include_top=False)
     for layer in base.layers:
         layer.trainable = False
-    
-    x = base(inp)
+    x = base(inp_img)
     x = GlobalAveragePooling2D()(x)
+
+    # Create Wide leg
+    inp_tab = Input(shape=tab_input_shape)
+    x = Concatenate()([x, inp_tab])
+
     x = Dense(1)(x) # activation defaults to linear
 
-    model = Model(inp, x)
+    model = Model([inp_tab, inp_img], x)
 
     # compile model
     opt = Adam(learning_rate=1e-5)
@@ -82,11 +84,13 @@ def load_training_dataset(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_PATH:st
     # modify patient dataframe to create unique identifiers for each patient
     patient_df = pd.read_csv(LOCAL_PATIENT_TAB_PATH)
     patient_df['unique_id'] = patient_df['Patient'] + '___' + patient_df['Weeks'].astype(str)
-    patient_keys = patient_df['unique_id'].unique().tolist() # like ID00007637202177411956430___7
+    
+    # get list of all images - need in order to remove patients that could not be masked
+    images_list = [os.path.splitext(f)[0] for f in os.listdir(LOCAL_PATIENT_MASKS_DIR)]
+    patients_with_masks = list(set([p.split('_')[0] for p in images_list])) # unique patients, not used rn
+    patient_keys = patient_df[patient_df['Patient'].isin(patients_with_masks)]\
+        ['unique_id'].unique().tolist() # like ID00007637202177411956430___7
 
-    # # get list of all images
-    # images_list = [os.path.splitext(f)[0] for f in os.listdir(LOCAL_PATIENT_MASKS_DIR)]
-    # patients_ids = list(set([p.split('_')[0] for p in images_list])) # unique patients, not used rn
 
     # get partition and labels dicts for datagenerator class
     partition = {} # {'train':[<ids>], 'validation':[<ids>]}
