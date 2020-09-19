@@ -33,7 +33,7 @@ def load_pickled_encodings(pickle_path, csv_path, key="Patient"):
     # Left join to data_frame on key
     return data_frame.join(patient_ct_encodings, on=key, how="left")
 
-def get_postproc_pipeline(no_op_attrs, num_attrs, cat_attrs, encoded_attrs):
+def get_postproc_pipeline(no_op_attrs:list=[], num_attrs:list=[], cat_attrs:list=[], encoded_attrs:list=[]):
     """Returns a post-processing pipeline for a unified DF"""
     ops = []
     # Define the no-operation pipeline

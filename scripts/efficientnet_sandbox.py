@@ -4,6 +4,7 @@ import numpy as np
 import json
 import os
 import random
+import datetime
 import pandas as pd
 from typing import Tuple
 import efficientnet.tfkeras as efn
@@ -12,6 +13,8 @@ from tensorflow.keras.layers import (
     Dense, Dropout, Activation, Flatten, Input, BatchNormalization, GlobalAveragePooling2D, Add, Conv2D, AveragePooling2D, 
     LeakyReLU, Concatenate)
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
+
 from myDataGenerator import myDataGenerator
 import sys
 sys.path.append('./src/')
@@ -91,6 +94,10 @@ def load_training_dataset(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_PATH:st
     patient_keys = patient_df[patient_df['Patient'].isin(patients_with_masks)]\
         ['unique_id'].unique().tolist() # like ID00007637202177411956430___7
 
+    # run FVC through standardization pipeline
+    fvc_pipeline = get_postproc_pipeline(num_attrs=['FVC'])
+    std_fvc = fvc_pipeline.fit_transform(patient_df)#.toarray()
+    patient_df['FVC'] = std_fvc
 
     # get partition and labels dicts for datagenerator class
     partition = {} # {'train':[<ids>], 'validation':[<ids>]}
@@ -126,6 +133,38 @@ def load_training_dataset(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_PATH:st
     return training_generator, validation_generator
 
 
+def train_model(model, training_generator, validation_generator, n_epochs=10, suffix=None):
+    '''
+    ::param model:: model to train
+    ::param training_generator:: training batch generator - feeds image and tabular data
+    ::param validation_generator:: validation batch generator
+    ::param n_epochs:: number of epochs to train
+    ::param suffix:: custom string to add to model
+    '''
+
+    # prepare model checkpoint callback
+    now = datetime.datetime.now().isoformat(timespec="minutes")
+    model_checkpoint_callback = ModelCheckpoint(
+        filepath=f'./models/wide_and_deep_model_{"" if suffix is None else suffix}_{now}',
+        monitor="val_loss",
+        save_best_only=True,
+    )
+    # prepare tensorboard callback
+    log_dir = "/tmp/wide_and_deep/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    tensorboard_callback = TensorBoard(
+        log_dir=log_dir, histogram_freq=10
+    )  # call tensorboard with `tensorboard --logdir /tmp/wide_and_deep` from your env
+
+    # train
+    model.fit(
+        x=training_generator,
+        epochs=n_epochs,
+        verbose=1,
+        validation_data=validation_generator,
+        callbacks=[tensorboard_callback, model_checkpoint_callback]
+        )
+
+
 def main():
     LOCAL_PATIENT_TAB_PATH = "./data/train.csv"
     LOCAL_PATIENT_MASKS_DIR = "./data/processed_data/patient_masks_224/"
@@ -141,12 +180,12 @@ def main():
     model.summary()
 
     # train model
-    model.fit(
-        x=training_generator,
-        epochs=2,
-        verbose=1,
-        validation_data=validation_generator
-        )
+    train_model(model=model, 
+        training_generator=training_generator,
+        validation_generator=validation_generator,
+        n_epochs=1000
+    )
+
 
 if __name__ == '__main__':
     main()
