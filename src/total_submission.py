@@ -18,14 +18,14 @@ from pipelines import (
 )
 from regressor import create_dense_regressor, train_model
 from inference import infer
+from evaluation import evaluate_submission
 
 
 def main():
     # flags to assist in kaggle versus development
-    is_kaggle_submission = False    # is this a final submission run for kaggle
-    do_preproc = False              # should we read from disc and perform preprocessing
-    # is this a run on training data (for offline eval)
-    eval_on_training = True
+    is_kaggle_submission = False  # is this a final submission run for kaggle
+    do_preproc = False            # should we read from disc and perform preprocessing
+    eval_on_training = True       # is this run on training data (offline eval)
 
     # setting up the respective numpy files for training/test to use if do_preproc is false
     if do_preproc:
@@ -80,6 +80,7 @@ def main():
     # 5. train regressor models                     (train)
     # 6. generate predictions and confidence values (train)
     # 7. generate output file                       (train)
+    # 7. evaluate output file                       (train)
 
     # constants
     img_px_size = 64
@@ -262,6 +263,9 @@ def main():
         full_test_data = all_test_data
         new_weeks = full_test_data.Weeks.values
 
+    if eval_on_training:
+        y_test = full_test_data.FVC.values
+
     X_test = full_test_data.drop(
         columns="FVC"
     )  # keep as a dataframe to pass to pipeline
@@ -270,7 +274,7 @@ def main():
     X_test = pipeline.transform(
         X_test
     ).toarray()  # using the previously fit pipeline here on the test data
-
+    
     preds = infer(regressor, X_test)
     quantile_preds = infer(quantile_regressor, X_test)
     patient_ids = np.asarray(full_test_data["Patient"])
@@ -282,21 +286,48 @@ def main():
     FVCs = []
     confidences = []
 
-    for patient, pred, patient_id, q_pred, week in zip(
-        X_test, preds, patient_ids, quantile_preds, new_weeks
-    ):
-        # print(f"ID: {patient_id} Weeks: {patient[0]} Pred: {pred[0]}, Truth: {truth}")
-        patient_week = f"{patient_id}_{week}"
-        patient_weeks.append(patient_week)
-        FVCs.append(int(pred[0]))
-        confidences.append(int(abs(q_pred[0] - pred[0])))
+    if eval_on_training:
+        true_values = []
 
-    results_df = pd.DataFrame(
-        {"Patient_Week": patient_weeks, "FVC": FVCs, "Confidence": confidences}
-    )
+        for patient, pred, patient_id, q_pred, week, true_y in zip(
+            X_test, preds, patient_ids, quantile_preds, new_weeks, y_test
+        ):
+            # print(f"ID: {patient_id} Weeks: {patient[0]} Pred: {pred[0]}, Truth: {truth}")
+            patient_week = f"{patient_id}_{week}"
+            patient_weeks.append(patient_week)
+            FVCs.append(int(pred[0]))
+            confidences.append(int(abs(q_pred[0] - pred[0])))
+            true_values.append(true_y)
+
+        results_df = pd.DataFrame(
+            {"Patient_Week": patient_weeks, "FVC": FVCs,
+                "Confidence": confidences, "Truth": true_values}
+        )
+    else:
+        for patient, pred, patient_id, q_pred, week in zip(
+            X_test, preds, patient_ids, quantile_preds, new_weeks
+        ):
+            # print(f"ID: {patient_id} Weeks: {patient[0]} Pred: {pred[0]}, Truth: {truth}")
+            patient_week = f"{patient_id}_{week}"
+            patient_weeks.append(patient_week)
+            FVCs.append(int(pred[0]))
+            confidences.append(int(abs(q_pred[0] - pred[0])))
+
+        results_df = pd.DataFrame(
+            {"Patient_Week": patient_weeks, "FVC": FVCs, "Confidence": confidences}
+        )
+
+
     print(results_df.head())
     print(f"Writing Results to {output_filepath}")
     results_df.to_csv(output_filepath, index=False)
+
+    ################################################
+    # 8. evaluate output file if necessary
+    ################################################
+    if eval_on_training:
+        metric = evaluate_submission(results_df)
+        print(f'Laplace Log Likelihood: {metric}')
 
 
 if __name__ == "__main__":

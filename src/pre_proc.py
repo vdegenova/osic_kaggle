@@ -355,7 +355,7 @@ def save_to_disk(patient_volumes=None,
         print(f"saving to {filestring}")
         np.save(filestring, patient_volumes)
 
-    return
+    return filestring
 
 
 def main():
