@@ -77,6 +77,8 @@ def main():
     # Save a slice mask for each slice - generates 32,000 .npy files in <working_dir>/patient_masks_<im_px_size>/
     SAVE_SLICE_MASKS = True
     N_WIDE_AND_DEEP_EPOCHS = 10
+    # whether or not to keep trtaining data in memory for the wide and deep model
+    in_memory = True
 
     ################################################
     # 1. pre process data  (train and test data)
@@ -112,10 +114,11 @@ def main():
     # 2. train wide and deep model  (training data)
     ################################################
     # Load masked images into datagenerators
-    training_generator, validation_generator = efns.load_training_dataset(
+    training_generator, validation_generator, tab_pipeline, fvc_pipeline = efns.load_training_datagenerators(
         LOCAL_PATIENT_MASKS_DIR=os.path.join(
             working_dir, f"patient_masks_{img_px_size}/"),
-        LOCAL_PATIENT_TAB_PATH=training_csv_dir
+        LOCAL_PATIENT_TAB_PATH=training_csv_dir,
+        in_memory=in_memory,
     )
 
     model = efns.build_wide_and_deep()
