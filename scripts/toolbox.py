@@ -5,6 +5,7 @@ import pydicom
 import tqdm
 import pandas as pd
 import numpy as np
+from collections import defaultdict
 
 def get_patient_data(csv_path, patient_ids=None):
     """Returns the medical data associated with the provided patient_id,
@@ -84,68 +85,65 @@ def score_prediction(real, pred, conf, min_conf=70, max_err=1000):
     bounded_err = np.minimum(np.abs(real - pred), max_err)
     return -(np.sqrt(2) * bounded_err / bounded_conf) - np.log(np.sqrt(2) * bounded_conf)
 
-def search_best_confidence(model, csv_path, dicom_path, conf_band_size=10, verbose=False):
-    """Iteratively uses :model: to make FVC predictions at different confidence levels
-        to find the confidence that provides the best average laplace log likelihood for :model:
+def select_predictions(model, data_generator, eval_func="mean", eval_lambda=None, conf_func="std", verbose=False):
+    """Iteratively uses :model: and :data_generator: to make FVC predictions on sets of patient DICOMs.
+        Uses statistical measures to select a scalar prediction & calculate the inference confidence
 
     :param model: An inference model with a model.predict interface
     :type model: any interface-compliant class, required
-    :param csv_path: Absolute path to the csv file continaing patient data, e.g. 'train.csv'
-    :type csv_path: str, required
-    :param dicom_path: Absolute path to the directory containing the subdirs of patient DICOM images
-    :type dicom_path: str, required
-    :param conf_band_size: The size of confidence bands to test between 0 and 100.
-        Defaults to 10 (confidence deciles), to predict at 10th, 20th, etc. percentiles
-    :type conf_band_size: int, required
+    :param data_gen: A generator that iteratively returns batches of data
+    :type data_gen: generator, required
+    :param eval_func: Which statistical measure to use to select DICOM-predictions for a patient
+        This parameter is ignored if eval_lambda is passed.
+    :type eval_func: str, optional
+    :param eval_lambda: A lambda function to use to select a DICOM-predection from an array.
+        Must support batch operations. If passed, :eval_func: is ignored.
+    :type eval_lambda: func, optional
+    :param conf_func: Which statistical function to use to calculate prediciton confidence
+    :type conf_func: str, required
     :param verbose: Controls function verbosity while searching
     :type verbose: bool, optional
-    :return: The confidence band with the highest average laplace log likelihood for :model:
-    :rtype: int
+    :return: Returns a data frame containing a prediction row for each unique patient-week
+    :rtype: pd.DataFrame
     """
 
-    # Load data
-    average_scores = []
-    patient_data = get_patient_data(csv_path)
-    patient_dicoms = get_patient_dicoms(dicom_path)
+    eval_functions = {
+        "mean": np.mean,
+        "median": np.median,
+    }
 
-    # Make predictions at each confidence band
-    for conf in tqdm.tqdm(range(conf_band_size, 100, conf_band_size)):
-        conf_scores = []
-        # Use DICOM dict for keys to avoid patients with bad DICOMs
-        for pid, dicoms in patient_dicoms.items():
-            bio_data = patient_data[patient_data['Patient'] == pid]
-            dicoms = np.expand_dims(dicoms, axis=-1)
+    if eval_lambda is not None:
+        eval_func = eval_lambda
+    else:
+        eval_func = eval_functions[eval_func]
+    
+    # TODO: Dynamic confidence measure selection via partials
+    conf_functions = {
+        "std": np.std,
+    }
 
-            # Multiple training weeks for each patient - predict & score at each
-            patient_scores = []
-            for weekly_data in bio_data.itertuples():
-                real_fvc = weekly_data.FVC
-                # Vector of per-slice predictions
-                fvc_predictions = model.predict([bio_data, dicoms]) 
-                # Select the prediction that is the :conf:'th percentile of predictions
-                pred_fvc = np.quantile(fvc_predictions, conf / 100) # q param must be between 0-1
-                patient_scores.append(score_prediction(real_fvc, pred_fvc, conf))
+    conf_func = conf_functions[conf_func]
 
-            # Calc and add the patient's average prediction score for all slices
-            patient_avg_score = np.mean(patient_scores)
-            conf_scores.append(patient_avg_score)
-            if verbose:
-                print(
-                    f"Mean prediction score for patient {pid} at conf % {conf}: {patient_avg_score}"
-                )
-
-        # Calc and add the overall average prediction score for the current conf percentile
-        avg_conf_score = np.mean(conf_scores)
-        average_scores.append(avg_conf_score)
-        if verbose:
-            print(
-                f"Mean prediction score for all patients at conf % {conf}: {avg_conf_score}"
-            )
-
-    # Find the confidence with the best avg score for all patients - higher is better for LPL
-    best_score_idx = (np.argmax(average_scores) + 1)
-    best_confidence = conf_band_size * best_score_idx
     if verbose:
-        print(f"Confidence with the highest average prediction score: {best_confidence}")
+        print(f"Using eval function: {eval_func} and confidence function: {conf_func}")
 
-    return best_confidence
+    patient_predictions = pd.DataFrame([], columns=["Patient_Week", "FVC", "Confidence"])
+
+    # Each batch is the biographics and DICOMs for a single week of a single patient
+    for batch in data_generator:
+        # Each prediction returns an array of predictions, 1 per DICOM
+        predictions = model.predict_batch(batch)
+        # Use the eval function to select which DICOM-prediction to use for this patient-week
+        selection = eval_func(predictions)
+        # Use confidence function to generate the confidence of the DICOM-prediction for the patient-week
+        conf = conf_func(predictions)
+        # TODO: Grab patient_id and week from batch!
+        # patient_id = ?
+        # week = ?
+        patient_week = patient_id + week
+        if verbose:
+            print(f"Selected prediction for patient {patient_id} on week {week}: {selection}, with stddev {conf}")
+
+        patient_predictions.append([patient_week, selection, conf])
+
+    return patient_predictions

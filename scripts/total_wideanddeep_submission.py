@@ -10,6 +10,7 @@ from pipelines import (
     load_pickled_encodings,
 )
 
+from .toolbox import select_predictions
 from evaluation import evaluate_submission
 import efficientnet_sandbox as efns
 
@@ -143,11 +144,15 @@ def main():
         pass
 
     # INSERT STU'S BOSS ASS DATA ENGINEERING FUNCTION HERE
-    # this function takes in the patients we need to generate output on
-    # it also takes in the trained model
-    # it also takes in min_weeks, and max_weeks, the range we need to predict on
-    # it runs inference on each slice independently and then calculates a standard deviation
-    # on each patient-week granularity
+    # select_predictions takes a trained model and a data generator
+    # It uses eval_func to select a specific DICOM-prediction per patient-week
+    # It uses conf_func to calculate the confidence of that prediction @ patient-week granularity
+    # It expects the data generators to return batches @ 1 patient-week granularity and to generate all required batches
+    # It expects to be able to pass the batch directly into the model
+    # It expects to have access to patient_id and week within the batch data set # TODO
+    # It returns a pd.DataFrame in the submission format 
+    training_predictions = select_predictions(model, training_generator, eval_func="mean", conf_func="std", verbose="True")
+    validation_predicitons = select_predictions(model, validation_generator, eval_func="mean", conf_func="std", verbose="True")
 
     ################################################
     # 4. generate output file
