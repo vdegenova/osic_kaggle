@@ -6,6 +6,7 @@ import os
 import random
 import datetime
 import pandas as pd
+from tqdm import tqdm
 from typing import Tuple
 import efficientnet.tfkeras as efn
 from tensorflow.keras import Model
@@ -72,7 +73,7 @@ def build_wide_and_deep(
     return model
 
 
-def load_training_dataset(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_PATH:str,
+def load_training_dataset(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_PATH:str, in_memory:bool=False,
     validation_split=0.7):
     # converts a loaded data dict of masked images into a proper dataset for NN training
     # https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
@@ -90,7 +91,7 @@ def load_training_dataset(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_PATH:st
     
     # get list of all images - need in order to remove patients that could not be masked
     images_list = [os.path.splitext(f)[0] for f in os.listdir(LOCAL_PATIENT_MASKS_DIR)]
-    patients_with_masks = list(set([p.split('_')[0] for p in images_list])) # unique patients, not used rn
+    patients_with_masks = list(set([p.split('_')[0] for p in images_list])) # like ID00007637202177411956430
     patient_keys = patient_df[patient_df['Patient'].isin(patients_with_masks)]\
         ['unique_id'].unique().tolist() # like ID00007637202177411956430___7
 
@@ -100,8 +101,19 @@ def load_training_dataset(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_PATH:st
     patient_df['FVC'] = std_fvc
 
     # get partition and labels dicts for datagenerator class
-    partition = {} # {'train':[<ids>], 'validation':[<ids>]}
-    labels = {}    # {<id>:y_true, ...}
+    partition = {}                  # {'train':[<ids>], 'validation':[<ids>]}
+    labels = {}                     # {<id>:y_true, ...}
+    patient_slices_library = None   # {<patient_id_sans_weeks>:<list of sorted np arrays>} # only used if in_memory is true
+
+    # assign patient slices to patient_slices_memory if we can train in memory
+    if in_memory:
+        patient_slices_library = {}
+        print('Loading patient data')
+        for patient in tqdm(patients_with_masks):
+            patient_image_files = [f for f in os.listdir(LOCAL_PATIENT_MASKS_DIR) if patient in f]
+            patient_image_files.sort(key=lambda x: int(os.path.splitext(x)[0].split('_')[-1]))
+            patient_slices_library[patient] = [np.load(os.path.join(LOCAL_PATIENT_MASKS_DIR, f)) for f in patient_image_files]
+
 
     # Assign train/validation keys
     random.shuffle(patient_keys)
@@ -121,13 +133,18 @@ def load_training_dataset(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_PATH:st
     for unique_id, arr in zip(patient_df['unique_id'].values, X): # [key, val]
         tab_data[unique_id] = arr
 
-    training_generator = myDataGenerator(list_ids=partition['train'],
+    training_generator = myDataGenerator(
+        list_ids=partition['train'],
         labels=labels,
         tab_data=tab_data,
+        patient_slices_library=patient_slices_library,
         **datagen_params)
-    validation_generator = myDataGenerator(list_ids=partition['validation'],
+
+    validation_generator = myDataGenerator(
+        list_ids=partition['validation'],
         labels=labels,
         tab_data=tab_data,
+        patient_slices_library=patient_slices_library,
         **datagen_params)
     
     return training_generator, validation_generator
@@ -168,11 +185,13 @@ def train_model(model, training_generator, validation_generator, n_epochs=10, su
 def main():
     LOCAL_PATIENT_TAB_PATH = "./data/train.csv"
     LOCAL_PATIENT_MASKS_DIR = "./data/processed_data/patient_masks_224/"
+    in_memory = True
 
     # Load masked images into datagenerators
     training_generator, validation_generator = load_training_dataset(
         LOCAL_PATIENT_MASKS_DIR=LOCAL_PATIENT_MASKS_DIR,
-        LOCAL_PATIENT_TAB_PATH=LOCAL_PATIENT_TAB_PATH
+        LOCAL_PATIENT_TAB_PATH=LOCAL_PATIENT_TAB_PATH,
+        in_memory=in_memory,
     )
 
     # lets just try predicting FVC from images alone
@@ -180,7 +199,8 @@ def main():
     model.summary()
 
     # train model
-    train_model(model=model, 
+    train_model(
+        model=model, 
         training_generator=training_generator,
         validation_generator=validation_generator,
         n_epochs=1000

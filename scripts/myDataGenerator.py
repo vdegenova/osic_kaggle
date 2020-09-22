@@ -20,8 +20,8 @@ class myDataGenerator(keras.utils.Sequence):
         tab_data_dim (int): how many elements to expect in the tabular data array
         n_classes (int): not used for regression
     '''
-    def __init__(self, list_ids, labels, data_dir, tab_data, batch_size=32, dim=(224,224,3), n_channels=1, tab_data_dim=7,
-                 n_classes=None, shuffle=True):
+    def __init__(self, list_ids, labels, data_dir, tab_data, batch_size=32, dim=(224,224,3), n_channels=1,
+                 tab_data_dim=7, patient_slices_library={}, n_classes=None, shuffle=True):
         self.dim = dim
         self.batch_size = batch_size
         self.labels = labels
@@ -32,6 +32,7 @@ class myDataGenerator(keras.utils.Sequence):
         self.shuffle = shuffle
         self.tab_data = tab_data
         self.tab_data_dim = tab_data_dim
+        self.patient_slices_library = patient_slices_library
         self.on_epoch_end()
 
     def __len__(self):
@@ -72,10 +73,17 @@ class myDataGenerator(keras.utils.Sequence):
         for i, ID in enumerate(list_ids_temp):
             # remember ID here is PatientID___Weeks
             patient_id_no_weeks = ID.split('___')[0]
+            
             # get image data
             all_patient_images = [f for f in os.listdir(self.data_dir) if patient_id_no_weeks in f]
-            #greyscale_img = np.load(self.data_dir + patient_id_no_weeks + '.npy')
-            greyscale_img = np.load(self.data_dir +random.choice(all_patient_images))
+            if self.patient_slices_library:
+                # read in-memory
+                greyscale_img = random.choice(self.patient_slices_library[patient_id_no_weeks])
+            else:
+                # sort dicoms and pull from the middle 50%
+                all_patient_images.sort(key=lambda x: int(os.path.splitext(x)[0].split('_')[-1]))
+                all_patient_IQR = all_patient_images[int(np.floor(.25*len(all_patient_images))):int(np.ceil(.75*len(all_patient_images)))]
+                greyscale_img = np.load(self.data_dir + random.choice(all_patient_IQR))
             try:
                 assert not np.any(np.isnan(greyscale_img))
             except AssertionError as e:
