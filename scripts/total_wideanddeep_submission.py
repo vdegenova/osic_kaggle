@@ -133,6 +133,8 @@ def main():
     # 3. Run inference & Calculate standard deviations  (test data)
     ################################################
 
+    # results_df = output_from_stus_function(**kwargs)
+
     # INSERT STU'S BOSS ASS DATA ENGINEERING FUNCTION HERE
     # this function takes in the patients we need to generate output on
     # it also takes in the trained model
@@ -143,103 +145,6 @@ def main():
     ################################################
     # 4. generate output file
     ################################################
-
-
-# OLD
-
-    ################################################
-    # 6. generate predictions and confidence values (test or train data)
-    # whether we're using test or train data here depends on the flag eval_on_training set above
-    ################################################
-    # first preprocess the test data for the regressor models
-
-    encodings_to_load = None
-    csv_to_load = None
-
-    if not eval_on_training:
-        encodings_to_load = testing_encoding_path
-        csv_to_load = test_csv_dir
-    else:
-        encodings_to_load = training_encoding_path
-        csv_to_load = training_csv_dir
-
-    all_test_data = load_pickled_encodings(encodings_to_load, csv_to_load)
-
-    if not eval_on_training:
-        all_test_data = all_test_data.drop_duplicates(
-            subset=["Patient"], keep="first")
-
-        min_weeks = -12
-        max_weeks = 133
-        weeks = list(range(min_weeks, max_weeks + 1, 1))
-
-        total_df = pd.concat([all_test_data] * len(weeks))
-
-        new_weeks = []
-        n_test_patients = all_test_data.Patient.nunique()
-        for week in weeks:
-            this_week_duped = [week] * n_test_patients
-            new_weeks.extend(this_week_duped)
-
-        total_df["Weeks"] = new_weeks
-        full_test_data = total_df
-    else:
-        full_test_data = all_test_data
-        new_weeks = full_test_data.Weeks.values
-
-    if eval_on_training:
-        y_test = full_test_data.FVC.values
-
-    X_test = full_test_data.drop(
-        columns="FVC"
-    )  # keep as a dataframe to pass to pipeline
-
-    # run the pipeline
-    X_test = pipeline.transform(
-        X_test
-    ).toarray()  # using the previously fit pipeline here on the test data
-
-    preds = infer(regressor, X_test)
-    quantile_preds = infer(quantile_regressor, X_test)
-    patient_ids = np.asarray(full_test_data["Patient"])
-
-    ################################################
-    # 7. generate output file
-    ################################################
-    patient_weeks = []
-    FVCs = []
-    confidences = []
-
-    if eval_on_training:
-        true_values = []
-
-        for patient, pred, patient_id, q_pred, week, true_y in zip(
-            X_test, preds, patient_ids, quantile_preds, new_weeks, y_test
-        ):
-            # print(f"ID: {patient_id} Weeks: {patient[0]} Pred: {pred[0]}, Truth: {truth}")
-            patient_week = f"{patient_id}_{week}"
-            patient_weeks.append(patient_week)
-            FVCs.append(int(pred[0]))
-            confidences.append(int(abs(q_pred[0] - pred[0])))
-            true_values.append(true_y)
-
-        results_df = pd.DataFrame(
-            {"Patient_Week": patient_weeks, "FVC": FVCs,
-                "Confidence": confidences, "Truth": true_values}
-        )
-    else:
-        for patient, pred, patient_id, q_pred, week in zip(
-            X_test, preds, patient_ids, quantile_preds, new_weeks
-        ):
-            # print(f"ID: {patient_id} Weeks: {patient[0]} Pred: {pred[0]}, Truth: {truth}")
-            patient_week = f"{patient_id}_{week}"
-            patient_weeks.append(patient_week)
-            FVCs.append(int(pred[0]))
-            confidences.append(int(abs(q_pred[0] - pred[0])))
-
-        results_df = pd.DataFrame(
-            {"Patient_Week": patient_weeks, "FVC": FVCs, "Confidence": confidences}
-        )
 
     print(results_df.head())
     print(f"Writing Results to {output_filepath}")
