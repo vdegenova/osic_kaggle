@@ -3,6 +3,7 @@
 import numpy as np
 import json
 import os
+import sys
 import random
 import datetime
 import pandas as pd
@@ -17,7 +18,8 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
 
 from myDataGenerator import myDataGenerator
-import sys
+from myTestDataGenerator import myTestDataGenerator
+
 sys.path.append('./src/')
 from pipelines import (
     get_pipeline_selectors,
@@ -73,7 +75,7 @@ def build_wide_and_deep(
     return model
 
 
-def load_training_dataset(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_PATH:str, in_memory:bool=False,
+def load_training_datagenerators(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_PATH:str, in_memory:bool=False,
     validation_split=0.7):
     # converts a loaded data dict of masked images into a proper dataset for NN training
     # https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
@@ -127,9 +129,9 @@ def load_training_dataset(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_PATH:st
     # create internal dictionary for DataGenerators to use for processed tabular data
     tab_data = {} # {<id>: np.array(<encoded tabular data>)}
     no_op_attrs, num_attrs, cat_attrs, encoded_attrs = get_pipeline_selectors()
-    pipeline = get_postproc_pipeline(
+    tab_pipeline = get_postproc_pipeline(
         no_op_attrs, num_attrs, cat_attrs, encoded_attrs)
-    X = pipeline.fit_transform(patient_df).toarray()
+    X = tab_pipeline.fit_transform(patient_df).toarray()
     for unique_id, arr in zip(patient_df['unique_id'].values, X): # [key, val]
         tab_data[unique_id] = arr
 
@@ -147,7 +149,7 @@ def load_training_dataset(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_PATH:st
         patient_slices_library=patient_slices_library,
         **datagen_params)
     
-    return training_generator, validation_generator
+    return training_generator, validation_generator, tab_pipeline, fvc_pipeline
 
 
 def train_model(model, training_generator, validation_generator, n_epochs=10, suffix=None):
@@ -182,13 +184,27 @@ def train_model(model, training_generator, validation_generator, n_epochs=10, su
         )
 
 
+def load_testing_datagenerator(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_PATH:str, in_memory:bool=False):
+    
+    datagen_params = {
+        'dim': (224, 224),
+        'batch_size': 32,
+        'n_channels': 3,
+        'data_dir':LOCAL_PATIENT_MASKS_DIR
+    }
+
+    # modify patient dataframe to create unique identifiers for each patient
+    patient_df = pd.read_csv(LOCAL_PATIENT_TAB_PATH)
+    patient_df['unique_id'] = patient_df['Patient'] + '___' + patient_df['Weeks'].astype(str)
+
+
 def main():
     LOCAL_PATIENT_TAB_PATH = "./data/train.csv"
     LOCAL_PATIENT_MASKS_DIR = "./data/processed_data/patient_masks_224/"
     in_memory = True
 
     # Load masked images into datagenerators
-    training_generator, validation_generator = load_training_dataset(
+    training_generator, validation_generator, tab_pipeline, fvc_pipeline = load_training_datagenerators(
         LOCAL_PATIENT_MASKS_DIR=LOCAL_PATIENT_MASKS_DIR,
         LOCAL_PATIENT_TAB_PATH=LOCAL_PATIENT_TAB_PATH,
         in_memory=in_memory,
