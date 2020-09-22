@@ -85,8 +85,8 @@ def main():
     # constants
     img_px_size = 64
     slice_count = 8
-    N_AUTOENCODER_EPOCHS = 1
-    N_REGRESSOR_EPOCHS = 1
+    N_AUTOENCODER_EPOCHS = 50
+    N_REGRESSOR_EPOCHS = 50
 
     # we only read in data from disc if do_preproc is set to true, otherwise we use the numpy files that are set above
     if do_preproc:
