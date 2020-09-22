@@ -39,7 +39,6 @@ def main():
         training_csv_dir = "/kaggle/input/osic-pulmonary-fibrosis-progression/train.csv"
         test_dir = "/kaggle/input/osic-pulmonary-fibrosis-progression/test/"
         test_csv_dir = "/kaggle/input/osic-pulmonary-fibrosis-progression/test.csv"
-        encoding_filepath = f"{working_dir}patient_ids_to_encodings_dict"
         output_filepath = "/kaggle/working/submission.csv"
     else:
         # local filepaths
@@ -49,7 +48,6 @@ def main():
         training_csv_dir = "./data/train.csv"
         test_dir = "./data/test/"
         test_csv_dir = "./data/test.csv"
-        encoding_filepath = f"{working_dir}patient_ids_to_encodings_dict"
 
         substr = ""
         if eval_on_training:
@@ -78,7 +76,7 @@ def main():
     SAVE_MASKING_DICT = False
     # Save a slice mask for each slice - generates 32,000 .npy files in <working_dir>/patient_masks_<im_px_size>/
     SAVE_SLICE_MASKS = True
-    N_WIDE_AND_DEEP_EPOCHS = 1000
+    N_WIDE_AND_DEEP_EPOCHS = 10
 
     ################################################
     # 1. pre process data  (train and test data)
@@ -115,7 +113,8 @@ def main():
     ################################################
     # Load masked images into datagenerators
     training_generator, validation_generator = efns.load_training_dataset(
-        LOCAL_PATIENT_MASKS_DIR=os.path.join(working_dir, 'patient_masks_224'),
+        LOCAL_PATIENT_MASKS_DIR=os.path.join(
+            working_dir, f"patient_masks_{img_px_size}/"),
         LOCAL_PATIENT_TAB_PATH=training_csv_dir
     )
 
@@ -133,7 +132,12 @@ def main():
     # 3. Run inference & Calculate standard deviations  (test data)
     ################################################
 
-    # results_df = output_from_stus_function(**kwargs)
+    if eval_on_training:
+        # results_df = output_from_stus_function(**kwargs, training_data)
+        pass
+    else:
+        # results_df = output_from_stus_function(**kwargs, test_data)
+        pass
 
     # INSERT STU'S BOSS ASS DATA ENGINEERING FUNCTION HERE
     # this function takes in the patients we need to generate output on
@@ -145,6 +149,10 @@ def main():
     ################################################
     # 4. generate output file
     ################################################
+
+    if eval_on_training:
+        # add TRUTH column to results csv returned in 3.
+        pass
 
     print(results_df.head())
     print(f"Writing Results to {output_filepath}")
