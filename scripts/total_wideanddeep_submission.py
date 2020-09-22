@@ -2,23 +2,16 @@ import numpy as np
 import pickle
 import datetime
 import pandas as pd
+import os
 from pre_proc import read_in_data, save_to_disk
-from autoencoder import (
-    create_jesse_autoencoder,
-    get_training__and_validation_data_and_patients,
-    train_with_augmentation,
-    encode_patients,
-    merge_dicts,
-    get_test_data_and_patients,
-)
 from pipelines import (
     get_pipeline_selectors,
     get_postproc_pipeline,
     load_pickled_encodings,
 )
-from regressor import create_dense_regressor, train_model
-from inference import infer
+
 from evaluation import evaluate_submission
+import efficientnet_sandbox as efns
 
 
 def main():
@@ -64,164 +57,95 @@ def main():
         output_filepath = f"./working/{substr}submission.csv"
 
     # overall program flow (submission)
-    # 1. read in data                               (train and test)
-    # 2. pre process data                           (train and test)
-    # 3. train autoencoder                          (training data)
-    # 4. embed images                               (train and test)
-    # 5. train regressor models                     (training data)
-    # 6. generate predictions and confidence values (test data)
-    # 7. generate output file                       (test data)
+    # 1. pre process data                               (train and test data)
+    # 2. train wide and deep model                      (training data)
+    # 3. Run inference & Calculate standard deviations  (test data)
+    # 4. generate output file                           (test data)
 
     # overall program flow (eval_on_training = true)
-    # 1. read in data                               (train)
-    # 2. pre process data                           (train)
-    # 3. train autoencoder                          (train)
-    # 4. embed images                               (train)
-    # 5. train regressor models                     (train)
-    # 6. generate predictions and confidence values (train)
-    # 7. generate output file                       (train)
-    # 7. evaluate output file                       (train)
+    # 1. pre process data                               (train data)
+    # 2. train wide and deep model                      (train data)
+    # 3. Run inference & Calculate standard deviations  (train data)
+    # 4. generate output file                           (train data)
+    # 4. evaluate output file                           (train data)
 
     # constants
-    img_px_size = 64
-    slice_count = 8
-    N_AUTOENCODER_EPOCHS = 50
-    N_REGRESSOR_EPOCHS = 50
+    img_px_size = 224
+    slice_count = None  # setting to None will not resize slices in z
+    # Save a volume for each patient - generates 1 .npy file
+    SAVE_PATIENT_VOLUMES = False
+    # Save a {patient:masks} json - generates 1 .json file
+    SAVE_MASKING_DICT = False
+    # Save a slice mask for each slice - generates 32,000 .npy files in <working_dir>/patient_masks_<im_px_size>/
+    SAVE_SLICE_MASKS = True
+    N_WIDE_AND_DEEP_EPOCHS = 1000
 
+    ################################################
+    # 1. pre process data  (train and test data)
+    ################################################
     # we only read in data from disc if do_preproc is set to true, otherwise we use the numpy files that are set above
     if do_preproc:
-        ################################################
-        # 1. read in data (train and test)
-        ################################################
-        patient_training_data = read_in_data(
+        patient_training_volumes, patient_training_masking_dict = read_in_data(
+            csv_path=training_csv_dir,
             patient_dir=training_dir,
             img_px_size=img_px_size,
             slice_count=slice_count,
             verbose=True,
-            csv_path=training_csv_dir,
+            SAVE_PATIENT_VOLUMES=SAVE_PATIENT_VOLUMES,
+            SAVE_MASKING_DICT=SAVE_MASKING_DICT,
+            SAVE_SLICE_MASKS=SAVE_SLICE_MASKS,
+            working_dir=working_dir
         )
 
         if not eval_on_training:
-            patient_test_data = read_in_data(
+            patient_test_volumes, patient_test_masking_dict = read_in_data(
+                csv_path=test_csv_dir,
                 patient_dir=test_dir,
                 img_px_size=img_px_size,
                 slice_count=slice_count,
                 verbose=True,
-                csv_path=test_csv_dir,
+                SAVE_PATIENT_VOLUMES=SAVE_PATIENT_VOLUMES,
+                SAVE_MASKING_DICT=SAVE_MASKING_DICT,
+                SAVE_SLICE_MASKS=SAVE_SLICE_MASKS,
+                working_dir=working_dir
             )
 
-        ################################################
-        # 2. pre process dicom data (train and test)
-        ################################################
-        preprocessed_training_npy = save_to_disk(
-            patient_training_data,
-            img_px_size=img_px_size,
-            slice_count=slice_count,
-            working_dir=working_dir,
-        )
-
-        if not eval_on_training:
-            preprocessed_test_npy = save_to_disk(
-                patient_test_data,
-                img_px_size=img_px_size,
-                slice_count=slice_count,
-                working_dir=working_dir,
-            )
-            del patient_test_data
-
-        del patient_training_data
-
     ################################################
-    # 3. train autoencoder (training data)
+    # 2. train wide and deep model  (training data)
     ################################################
-    autoencoder, encoder = create_jesse_autoencoder(lr=1e-4)
-    (
-        training_data,
-        val_data,
-        training_patients,
-        val_patients,
-    ) = get_training__and_validation_data_and_patients(preprocessed_training_npy)
-    train_with_augmentation(
-        autoencoder, training_data, val_data, n_epochs=N_AUTOENCODER_EPOCHS
+    # Load masked images into datagenerators
+    training_generator, validation_generator = efns.load_training_dataset(
+        LOCAL_PATIENT_MASKS_DIR=os.path.join(working_dir, 'patient_masks_224'),
+        LOCAL_PATIENT_TAB_PATH=training_csv_dir
     )
 
-    ################################################
-    # 4. embed dicom images (train and test)
-    ################################################
-    # format is like {PatientID: flatten(embeddings)}
-    encoded_training_patients = encode_patients(
-        training_patients, training_data, encoder
-    )
-    encoded_val_patients = encode_patients(val_patients, val_data, encoder)
-    all_encoded_training_patients = merge_dicts(
-        encoded_training_patients, encoded_val_patients
-    )
+    model = efns.build_wide_and_deep()
+    model.summary()
 
-    if not eval_on_training:
-        test_data, test_patients = get_test_data_and_patients(
-            preprocessed_test_npy)
-        encoded_test_patients = encode_patients(
-            test_patients, test_data, encoder)
-
-    # Save embeddings as pkl of dictionary
-    now = datetime.datetime.now().isoformat(timespec="minutes")
-    training_encoding_path = encoding_filepath + f"-training-{now}.pkl"
-    print("{} Training Patients encoded.".format(
-        len(all_encoded_training_patients)))
-    print("Saving to {}.pkl".format(training_encoding_path))
-
-    with open(training_encoding_path, "wb") as f:
-        pickle.dump(all_encoded_training_patients, f, pickle.HIGHEST_PROTOCOL)
-    del all_encoded_training_patients
-
-    if not eval_on_training:
-        testing_encoding_path = encoding_filepath + f"-test-{now}.pkl"
-        print("{} Test Patients encoded.".format(len(encoded_test_patients)))
-        print("Saving to {}.pkl".format(testing_encoding_path))
-
-        with open(testing_encoding_path, "wb") as f:
-            pickle.dump(encoded_test_patients, f, pickle.HIGHEST_PROTOCOL)
-        del encoded_test_patients
+    # train model
+    efns.train_model(model=model,
+                     training_generator=training_generator,
+                     validation_generator=validation_generator,
+                     n_epochs=N_WIDE_AND_DEEP_EPOCHS
+                     )
 
     ################################################
-    # 5. train regressor models (training data)
+    # 3. Run inference & Calculate standard deviations  (test data)
     ################################################
-    # pass embedding + csv filepaths to function to unify into one dataframe
-    all_data = load_pickled_encodings(training_encoding_path, training_csv_dir)
-    X = all_data.drop(columns="FVC")  # keep as a dataframe to pass to pipeline
-    y = all_data[["FVC"]]
 
-    # get, run pipeline
-    no_op_attrs, num_attrs, cat_attrs, encoded_attrs = get_pipeline_selectors()
-    pipeline = get_postproc_pipeline(
-        no_op_attrs, num_attrs, cat_attrs, encoded_attrs)
-    X = pipeline.fit_transform(
-        X
-    ).toarray()  # returns scipy.sparse.csr.csr_matrix by default
+    # INSERT STU'S BOSS ASS DATA ENGINEERING FUNCTION HERE
+    # this function takes in the patients we need to generate output on
+    # it also takes in the trained model
+    # it also takes in min_weeks, and max_weeks, the range we need to predict on
+    # it runs inference on each slice independently and then calculates a standard deviation
+    # on each patient-week granularity
 
-    # Create regressor and  quantile regressor
-    regressor = create_dense_regressor(n_input_dims=X.shape[1])
-    quantile_regressor = create_dense_regressor(
-        n_input_dims=X.shape[1], quantile_regression=True
-    )
+    ################################################
+    # 4. generate output file
+    ################################################
 
-    # train both regressor models
-    train_model(
-        regressor,
-        X,
-        y,
-        validation_split=0.3,
-        n_epochs=N_REGRESSOR_EPOCHS,
-        suffix="og_regressor",
-    )
-    train_model(
-        quantile_regressor,
-        X,
-        y,
-        validation_split=0.3,
-        n_epochs=N_REGRESSOR_EPOCHS,
-        suffix="quantile_90",
-    )
+
+# OLD
 
     ################################################
     # 6. generate predictions and confidence values (test or train data)
@@ -274,7 +198,7 @@ def main():
     X_test = pipeline.transform(
         X_test
     ).toarray()  # using the previously fit pipeline here on the test data
-    
+
     preds = infer(regressor, X_test)
     quantile_preds = infer(quantile_regressor, X_test)
     patient_ids = np.asarray(full_test_data["Patient"])
@@ -316,7 +240,6 @@ def main():
         results_df = pd.DataFrame(
             {"Patient_Week": patient_weeks, "FVC": FVCs, "Confidence": confidences}
         )
-
 
     print(results_df.head())
     print(f"Writing Results to {output_filepath}")
