@@ -12,25 +12,22 @@ class myTestDataGenerator(keras.utils.Sequence):
     Each batch should be 1 patient, 1 week, but all dicoms
     ATTRS:
         data_dir (str): path to where our image data is found
-        tab_data (dict): internal resource mapping {id:np.array(tabular data, post pipeline)}
         dim (tuple): tuple of ints for image data specifying size and channels. honest to god dont know why we need this and n_channels
         n_channels (int): if channels is > 1, it will stack the greyscale images into multiple channels
-        tab_data_dim (int): how many elements to expect in the tabular data array
         n_classes (int): not used for regression
         patient_slices_library (dict): {<patient_id>:<list of sorted np arrays>} used to keep arrays in-memory
 
         df (pd.DataFrame): the testing df which includes 'Patient' as well as unpipelined patient data
         tab_pipeline (sklearn.pipeline.Pipeline): a trained pipeline to run the test tab data through
     '''
-    def __init__(self, df, tab_pipeline, data_dir, tab_data, dim=(224,224,3), n_channels=1,
-                 tab_data_dim=7, patient_slices_library={}, n_classes=None, shuffle=False):
+    def __init__(self, df, tab_pipeline, data_dir, dim=(224,224,3), n_channels=1,
+                 patient_slices_library={}, n_classes=None, shuffle=False):
         self.dim = dim
         self.batch_size = 1
         self.data_dir = data_dir
         self.n_channels = n_channels
         self.n_classes = n_classes
         self.shuffle = shuffle
-        self.tab_data_dim = tab_data_dim
         self.on_epoch_end()
         self.tab_pipeline = tab_pipeline
         self.df = df
@@ -71,7 +68,6 @@ class myTestDataGenerator(keras.utils.Sequence):
         # calculate the pseudo batch-size: is number of dicoms
         pseudo_batch = len(self.patient_slices_library[patient_id_no_weeks]))
         x_imgs = np.empty((pseudo_batch, *self.dim, self.n_channels))
-        x_tab = np.empty((pseudo_batch, self.tab_data_dim))
 
         # Generate data
         ID = list_ids_temp[0]
@@ -79,7 +75,9 @@ class myTestDataGenerator(keras.utils.Sequence):
         patient_id_no_weeks = ID.split('___')[0]
 
         # get tabular data
-        x_tab = np.stack((self.tab_data[ID],)*pseudo_batch, axis=0)
+        patient_df = self.df[self.df['unique_id']==ID]
+        post_pipeline_tab = self.tab_pipeline.transform(patient_df)
+        x_tab = np.stack((post_pipeline_tab,)*pseudo_batch, axis=0)
         
         # get image data
         # read in-memory

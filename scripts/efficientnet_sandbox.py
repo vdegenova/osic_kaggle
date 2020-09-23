@@ -191,7 +191,17 @@ def train_model(model, training_generator, validation_generator, n_epochs=10, su
 
 
 def load_testing_datagenerator(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_PATH:str, tab_pipeline:sklearn.pipeline.Pipeline, in_memory:bool=False):
-    
+    '''
+    returns a generator for the test set
+    :param LOCAL_PATIENT_MASKS_DIR: Where to find the masks associated with each patient dicoms
+    :param LOCAL_PATIENT_TAB_PATH: filepath for csv of test data
+    :param tab_pipeline: pipeline that was used on the tabular training data
+    :param in_memory: not used. Will keep resources in memory.
+
+    :return: Returns a data generator which returns a batch 1 patient, 1 week, all dicoms
+    :rtype: myTestDataGenerator(keras.utils.Sequence)
+
+    '''
     datagen_params = {
         'dim': (224, 224),
         'batch_size': 1,
@@ -216,6 +226,8 @@ def load_testing_datagenerator(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_PA
     
     total_df = pd.concat([patient_df] * len (weeks))
     total_df['Weeks'] = new_weeks
+    total_df['unique_id'] = total_df['Patient'] + \
+        '___' + total_df['Weeks'].astype(str)
 
     # get list of all images - need in order to remove patients that could not be masked
     images_list = [os.path.splitext(f)[0] for f in os.listdir(LOCAL_PATIENT_MASKS_DIR)]
@@ -229,7 +241,9 @@ def load_testing_datagenerator(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_PA
         patient_image_files.sort(key=lambda x: int(os.path.splitext(x)[0].split('_')[-1]))
         patient_slices_library[patient] = [np.load(os.path.join(LOCAL_PATIENT_MASKS_DIR, f)) for f in patient_image_files]
 
-    test_datagenerator = myTestDataGenerator(df=df, tab_pipeline)
+    test_datagenerator = myTestDataGenerator(df=df, tab_pipeline=tab_pipeline)
+
+    return test_datagenerator
 
 
 def main():
