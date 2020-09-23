@@ -9,31 +9,33 @@ class myTestDataGenerator(keras.utils.Sequence):
     '''
     Generates data for keras
     # https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
+    Each batch should be 1 patient, 1 week, but all dicoms
     ATTRS:
-        list_ids (list): list of ids to include. This is how we separate the training and validation dataloaders
-        labels (dict): dictionary mapping of {id:y_true}
         data_dir (str): path to where our image data is found
         tab_data (dict): internal resource mapping {id:np.array(tabular data, post pipeline)}
-        batch_size (int): how many data points to generate per call
         dim (tuple): tuple of ints for image data specifying size and channels. honest to god dont know why we need this and n_channels
         n_channels (int): if channels is > 1, it will stack the greyscale images into multiple channels
         tab_data_dim (int): how many elements to expect in the tabular data array
         n_classes (int): not used for regression
+        patient_slices_library (dict): {<patient_id>:<list of sorted np arrays>} used to keep arrays in-memory
+
+        df (pd.DataFrame): the testing df which includes 'Patient' as well as unpipelined patient data
+        tab_pipeline (sklearn.pipeline.Pipeline): a trained pipeline to run the test tab data through
     '''
-    def __init__(self, list_ids, labels, data_dir, tab_data, batch_size=1, dim=(224,224,3), n_channels=1,
-                 tab_data_dim=7, patient_slices_library={}, n_classes=None, shuffle=True):
+    def __init__(self, df, tab_pipeline, data_dir, tab_data, dim=(224,224,3), n_channels=1,
+                 tab_data_dim=7, patient_slices_library={}, n_classes=None, shuffle=False):
         self.dim = dim
-        self.batch_size = batch_size
-        self.labels = labels
+        self.batch_size = 1
         self.data_dir = data_dir
-        self.list_ids = list_ids
         self.n_channels = n_channels
         self.n_classes = n_classes
         self.shuffle = shuffle
-        self.tab_data = tab_data
         self.tab_data_dim = tab_data_dim
-        self.patient_slices_library = patient_slices_library
         self.on_epoch_end()
+        self.tab_pipeline = tab_pipeline
+        self.df = df
+        self.patient_slices_library = patient_slices_library
+        self.list_ids = df['unique_id'].unique()
 
     def __len__(self):
         '''Denotes the number of batches per epoch'''
@@ -65,41 +67,33 @@ class myTestDataGenerator(keras.utils.Sequence):
         '''Generates data containing batch_size samples''' # X : (n_samples, *dim, n_channels)
         # each item of X needs to be a tuple. The first item can be the image, the second must be tabular
         # Initialization
-        x_imgs = np.empty((self.batch_size, *self.dim, self.n_channels))
-        x_tab = np.empty((self.batch_size, self.tab_data_dim))
-        y = np.empty((self.batch_size), dtype=int)
+
+        # calculate the pseudo batch-size: is number of dicoms
+        pseudo_batch = len(self.patient_slices_library[patient_id_no_weeks]))
+        x_imgs = np.empty((pseudo_batch, *self.dim, self.n_channels))
+        x_tab = np.empty((pseudo_batch, self.tab_data_dim))
 
         # Generate data
-        for i, ID in enumerate(list_ids_temp):
-            # remember ID here is PatientID___Weeks
-            patient_id_no_weeks = ID.split('___')[0]
-            
-            # get image data
-            all_patient_images = [f for f in os.listdir(self.data_dir) if patient_id_no_weeks in f]
-            if self.patient_slices_library:
-                # read in-memory
-                greyscale_img = random.choice(self.patient_slices_library[patient_id_no_weeks])
-            else:
-                # sort dicoms and pull from the middle 50%
-                all_patient_images.sort(key=lambda x: int(os.path.splitext(x)[0].split('_')[-1]))
-                all_patient_IQR = all_patient_images[int(np.floor(.25*len(all_patient_images))):int(np.ceil(.75*len(all_patient_images)))]
-                greyscale_img = np.load(self.data_dir + random.choice(all_patient_IQR))
+        ID = list_ids_temp[0]
+        # remember ID here is PatientID___Weeks
+        patient_id_no_weeks = ID.split('___')[0]
+
+        # get tabular data
+        x_tab = np.stack((self.tab_data[ID],)*pseudo_batch, axis=0)
+        
+        # get image data
+        # read in-memory
+        for i, greyscale_img in enumerate(self.patient_slices_library[patient_id_no_weeks])
             try:
                 assert not np.any(np.isnan(greyscale_img))
             except AssertionError as e:
                 e.args += ('###############', ID, '###############')
                 raise
-            
-            # get tabular data
-            x_tab[i,] = self.tab_data[ID]
 
             if self.n_channels > 1:
                 x_imgs[i,] = np.stack((greyscale_img,)*self.n_channels, axis=-1) # here I am making 1 channel into x duplicate channels
             else:
                 x_imgs[i,] = greyscale_img
 
-            # Store class
-            y[i] = self.labels[ID]
-
         #return X, keras.utils.to_categorical(y, num_classes=self.n_classes) # wont need for regression
-        return [x_tab, x_imgs], y
+        return [x_tab, x_imgs]

@@ -44,7 +44,7 @@ def build_wide_and_deep(
     img_input_shape: Tuple[int, int, int] = (224, 224, 3),
     weights='noisy-student',
     tab_input_shape: Tuple[int, ] = (7,),
-):
+    ):
     '''
     Builds a wide and deep model by concatenating a base efficientnet model --with a vector of tabular data
     INPUTS
@@ -190,18 +190,46 @@ def train_model(model, training_generator, validation_generator, n_epochs=10, su
     )
 
 
-def load_testing_datagenerator(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_PATH:str, in_memory:bool=False):
+def load_testing_datagenerator(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_PATH:str, tab_pipeline:sklearn.pipeline.Pipeline, in_memory:bool=False):
     
     datagen_params = {
         'dim': (224, 224),
-        'batch_size': 32,
+        'batch_size': 1,
         'n_channels': 3,
         'data_dir':LOCAL_PATIENT_MASKS_DIR
     }
 
     # modify patient dataframe to create unique identifiers for each patient
     patient_df = pd.read_csv(LOCAL_PATIENT_TAB_PATH)
-    patient_df['unique_id'] = patient_df['Patient'] + '___' + patient_df['Weeks'].astype(str)
+    
+    # expand input dataframe to contain all weeks
+    patient_df = patient_df.drop_duplicates(subset=["Patient"], keep="first")
+    min_weeks = -12
+    max_weeks = 133
+    weeks = list(range(min_weeks, max_weeks + 1, 1))
+
+    new_weeks = []
+    n_test_patients = patient_df['Patient'].nunique()
+    for week in weeks:
+        this_week_duped = [week] * n_test_patients
+        new_weeks.extend(this_week_duped)
+    
+    total_df = pd.concat([patient_df] * len (weeks))
+    total_df['Weeks'] = new_weeks
+
+    # get list of all images - need in order to remove patients that could not be masked
+    images_list = [os.path.splitext(f)[0] for f in os.listdir(LOCAL_PATIENT_MASKS_DIR)]
+    patients_with_masks = list(set([p.split('_')[0] for p in images_list])) # like ID00007637202177411956430
+
+    # assign patient slices to patient_slices_memory if we can train in memory
+    patient_slices_library = {}
+    print('Loading patient data')
+    for patient in tqdm(patients_with_masks):
+        patient_image_files = [f for f in os.listdir(LOCAL_PATIENT_MASKS_DIR) if patient in f]
+        patient_image_files.sort(key=lambda x: int(os.path.splitext(x)[0].split('_')[-1]))
+        patient_slices_library[patient] = [np.load(os.path.join(LOCAL_PATIENT_MASKS_DIR, f)) for f in patient_image_files]
+
+    test_datagenerator = myTestDataGenerator(df=df, tab_pipeline)
 
 
 def main():
