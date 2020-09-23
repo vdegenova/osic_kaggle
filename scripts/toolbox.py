@@ -85,7 +85,7 @@ def score_prediction(real, pred, conf, min_conf=70, max_err=1000):
     bounded_err = np.minimum(np.abs(real - pred), max_err)
     return -(np.sqrt(2) * bounded_err / bounded_conf) - np.log(np.sqrt(2) * bounded_conf)
 
-def select_predictions(model, data_generator, eval_func="mean", eval_lambda=None, conf_func="std", verbose=False):
+def select_predictions(model, data_generator, eval_func="mean", eval_lambda=None, conf_func="std", conf_lambda=None, verbose=False):
     """Iteratively uses :model: and :data_generator: to make FVC predictions on sets of patient DICOMs.
         Uses statistical measures to select a scalar prediction & calculate the inference confidence
 
@@ -96,11 +96,14 @@ def select_predictions(model, data_generator, eval_func="mean", eval_lambda=None
     :param eval_func: Which statistical measure to use to select DICOM-predictions for a patient
         This parameter is ignored if eval_lambda is passed.
     :type eval_func: str, optional
-    :param eval_lambda: A lambda function to use to select a DICOM-predection from an array.
+    :param eval_lambda: A lambda function to use to select a DICOM-predection from an array of predictions.
         Must support batch operations. If passed, :eval_func: is ignored.
     :type eval_lambda: func, optional
     :param conf_func: Which statistical function to use to calculate prediciton confidence
-    :type conf_func: str, required
+    :type conf_func: str, optional
+    :param conf_lambda: A lambda function to use to generate the confidence of a DICOM-predection from an array of predictions.
+        Must support batch operations. If passed, :conf_func: is ignored.
+    :type conf_lambda: func, optional
     :param verbose: Controls function verbosity while searching
     :type verbose: bool, optional
     :return: Returns a data frame containing a prediction row for each unique patient-week
@@ -116,13 +119,15 @@ def select_predictions(model, data_generator, eval_func="mean", eval_lambda=None
         eval_func = eval_lambda
     else:
         eval_func = eval_functions[eval_func]
-    
-    # TODO: Dynamic confidence measure selection via partials
+
     conf_functions = {
         "std": np.std,
     }
 
-    conf_func = conf_functions[conf_func]
+    if conf_lambda is not None:
+        conf_func = conf_lambda
+    else:
+        conf_func = conf_functions[conf_func]
 
     if verbose:
         print(f"Using eval function: {eval_func} and confidence function: {conf_func}")
@@ -137,10 +142,11 @@ def select_predictions(model, data_generator, eval_func="mean", eval_lambda=None
         selection = eval_func(predictions)
         # Generate the confidence of the DICOM-prediction for the patient-week
         conf = conf_func(predictions)
-        patient_week = patient_id + week
+
         if verbose:
             print(f"Selected FVC prediction for patient {patient_id} on week {week}: {selection}, confidence {conf}")
 
+        patient_week = patient_id + week
         patient_predictions.append([patient_week, selection, conf])
 
     return patient_predictions
