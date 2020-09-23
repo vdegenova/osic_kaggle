@@ -91,7 +91,7 @@ def select_predictions(model, data_generator, eval_func="mean", eval_lambda=None
 
     :param model: An inference model with a model.predict interface
     :type model: any interface-compliant class, required
-    :param data_gen: A generator that iteratively returns batches of data
+    :param data_gen: A generator that iteratively returns batches of data in a (patient_id, week, batch) format.
     :type data_gen: generator, required
     :param eval_func: Which statistical measure to use to select DICOM-predictions for a patient
         This parameter is ignored if eval_lambda is passed.
@@ -129,20 +129,17 @@ def select_predictions(model, data_generator, eval_func="mean", eval_lambda=None
 
     patient_predictions = pd.DataFrame([], columns=["Patient_Week", "FVC", "Confidence"])
 
-    # Each batch is the biographics and DICOMs for a single week of a single patient
-    for batch in data_generator:
-        # Each prediction returns an array of predictions, 1 per DICOM
+    # Each batch is an array of [biographics, DICOM encodings] for a single week of a single patient
+    for patient_id, week, batch in data_generator:
+        # Each batch-prediction returns an array of predictions, 1 per DICOM encoding
         predictions = model.predict_batch(batch)
-        # Use the eval function to select which DICOM-prediction to use for this patient-week
+        # Select which DICOM-prediction to use for this patient-week
         selection = eval_func(predictions)
-        # Use confidence function to generate the confidence of the DICOM-prediction for the patient-week
+        # Generate the confidence of the DICOM-prediction for the patient-week
         conf = conf_func(predictions)
-        # TODO: Grab patient_id and week from batch!
-        # patient_id = ?
-        # week = ?
         patient_week = patient_id + week
         if verbose:
-            print(f"Selected prediction for patient {patient_id} on week {week}: {selection}, with stddev {conf}")
+            print(f"Selected FVC prediction for patient {patient_id} on week {week}: {selection}, confidence {conf}")
 
         patient_predictions.append([patient_week, selection, conf])
 

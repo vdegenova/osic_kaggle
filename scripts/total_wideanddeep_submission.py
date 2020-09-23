@@ -136,23 +136,17 @@ def main():
     # 3. Run inference & Calculate standard deviations  (test data)
     ################################################
 
-    if eval_on_training:
-        # results_df = output_from_stus_function(**kwargs, training_data)
-        pass
-    else:
-        # results_df = output_from_stus_function(**kwargs, test_data)
-        pass
-
-    # INSERT STU'S BOSS ASS DATA ENGINEERING FUNCTION HERE
     # select_predictions takes a trained model and a data generator
     # It uses eval_func to select a specific DICOM-prediction per patient-week
     # It uses conf_func to calculate the confidence of that prediction @ patient-week granularity
     # It expects the data generators to return batches @ 1 patient-week granularity and to generate all required batches
-    # It expects to be able to pass the batch directly into the model
-    # It expects to have access to patient_id and week within the batch data set # TODO
+    # It expects the data generator to return iterables of [patient_id, week, [model-compliant-batch]]
     # It returns a pd.DataFrame in the submission format 
-    training_predictions = select_predictions(model, training_generator, eval_func="mean", conf_func="std", verbose="True")
-    validation_predicitons = select_predictions(model, validation_generator, eval_func="mean", conf_func="std", verbose="True")
+
+    if eval_on_training:
+        results_df = select_predictions(model, training_generator, eval_func="mean", conf_func="std", verbose="True")
+    else:
+        results_df = select_predictions(model, validation_generator, eval_func="mean", conf_func="std", verbose="True")
 
     ################################################
     # 4. generate output file
