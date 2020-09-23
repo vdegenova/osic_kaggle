@@ -16,12 +16,13 @@ class myTestDataGenerator(keras.utils.Sequence):
         n_channels (int): if channels is > 1, it will stack the greyscale images into multiple channels
         n_classes (int): not used for regression
         patient_slices_library (dict): {<patient_id>:<list of sorted np arrays>} used to keep arrays in-memory
+        yield_tuple (bool): if True, will return (patient_id, week#, [x_tab, x_img])
 
         df (pd.DataFrame): the testing df which includes 'Patient' as well as unpipelined patient data
         tab_pipeline (sklearn.pipeline.Pipeline): a trained pipeline to run the test tab data through
     '''
     def __init__(self, df, tab_pipeline, data_dir, dim=(224,224,3), n_channels=1,
-                 patient_slices_library={}, n_classes=None, shuffle=False):
+                 patient_slices_library={}, n_classes=None, shuffle=False, yield_tuple=False):
         self.dim = dim
         self.batch_size = 1
         self.data_dir = data_dir
@@ -33,6 +34,7 @@ class myTestDataGenerator(keras.utils.Sequence):
         self.df = df
         self.patient_slices_library = patient_slices_library
         self.list_ids = df['unique_id'].unique()
+        self.yield_tuple = yield_tuple
 
     def __len__(self):
         '''Denotes the number of batches per epoch'''
@@ -65,14 +67,14 @@ class myTestDataGenerator(keras.utils.Sequence):
         # each item of X needs to be a tuple. The first item can be the image, the second must be tabular
         # Initialization
 
-        # calculate the pseudo batch-size: is number of dicoms
-        pseudo_batch = len(self.patient_slices_library[patient_id_no_weeks]))
-        x_imgs = np.empty((pseudo_batch, *self.dim, self.n_channels))
-
-        # Generate data
+        # Generate data. Batch size must be 1
         ID = list_ids_temp[0]
         # remember ID here is PatientID___Weeks
-        patient_id_no_weeks = ID.split('___')[0]
+        patient_id_no_weeks, weeks = ID.split('___')
+
+        # calculate the pseudo batch-size: is number of dicoms
+        pseudo_batch = len(self.patient_slices_library[patient_id_no_weeks])
+        x_imgs = np.empty((pseudo_batch, *self.dim, self.n_channels))
 
         # get tabular data
         patient_df = self.df[self.df['unique_id']==ID]
@@ -94,4 +96,7 @@ class myTestDataGenerator(keras.utils.Sequence):
                 x_imgs[i,] = greyscale_img
 
         #return X, keras.utils.to_categorical(y, num_classes=self.n_classes) # wont need for regression
-        return [x_tab, x_imgs]
+        if self.yield_tuple:
+            return (patient_id_no_weeks, weeks, [x_tab, x_imgs])
+        else:
+            return [x_tab, x_imgs]

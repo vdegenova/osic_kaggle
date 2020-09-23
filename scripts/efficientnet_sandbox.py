@@ -190,7 +190,7 @@ def train_model(model, training_generator, validation_generator, n_epochs=10, su
     )
 
 
-def load_testing_datagenerator(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_PATH:str, tab_pipeline:sklearn.pipeline.Pipeline, in_memory:bool=False):
+def load_testing_datagenerator(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_PATH:str, tab_pipeline, in_memory:bool=False):
     '''
     returns a generator for the test set
     :param LOCAL_PATIENT_MASKS_DIR: Where to find the masks associated with each patient dicoms
@@ -241,7 +241,7 @@ def load_testing_datagenerator(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_PA
         patient_image_files.sort(key=lambda x: int(os.path.splitext(x)[0].split('_')[-1]))
         patient_slices_library[patient] = [np.load(os.path.join(LOCAL_PATIENT_MASKS_DIR, f)) for f in patient_image_files]
 
-    test_datagenerator = myTestDataGenerator(df=df, tab_pipeline=tab_pipeline)
+    test_datagenerator = myTestDataGenerator(df=total_df, tab_pipeline=tab_pipeline, yield_tuple=True)
 
     return test_datagenerator
 
