@@ -1,5 +1,9 @@
 # playing with efficientnet
 # install efficientnet with `pip install -U efficientnet` :)
+from pipelines import (
+    get_pipeline_selectors,
+    get_postproc_pipeline,
+    load_pickled_encodings,)
 import numpy as np
 import json
 import os
@@ -21,12 +25,6 @@ from myDataGenerator import myDataGenerator
 from myTestDataGenerator import myTestDataGenerator
 
 sys.path.append('./src/')
-from pipelines import (
-    get_pipeline_selectors,
-    get_postproc_pipeline,
-    load_pickled_encodings,)
-from myDataGenerator import myDataGenerator
-import sys
 sys.path.append('./src/')
 
 # https://kobiso.github.io/Computer-Vision-Leaderboard/imagenet.html
@@ -44,7 +42,7 @@ def build_wide_and_deep(
     img_input_shape: Tuple[int, int, int] = (224, 224, 3),
     weights='noisy-student',
     tab_input_shape: Tuple[int, ] = (7,),
-    ):
+):
     '''
     Builds a wide and deep model by concatenating a base efficientnet model --with a vector of tabular data
     INPUTS
@@ -80,8 +78,8 @@ def build_wide_and_deep(
     return model
 
 
-def load_training_datagenerators(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_PATH:str, in_memory:bool=False,
-    validation_split=0.7):
+def load_training_datagenerators(LOCAL_PATIENT_MASKS_DIR: str, LOCAL_PATIENT_TAB_PATH: str, in_memory: bool = False,
+                                 validation_split=0.7):
     # converts a loaded data dict of masked images into a proper dataset for NN training
     # https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
 
@@ -98,10 +96,12 @@ def load_training_datagenerators(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_
         '___' + patient_df['Weeks'].astype(str)
 
     # get list of all images - need in order to remove patients that could not be masked
-    images_list = [os.path.splitext(f)[0] for f in os.listdir(LOCAL_PATIENT_MASKS_DIR)]
-    patients_with_masks = list(set([p.split('_')[0] for p in images_list])) # like ID00007637202177411956430
-    patient_keys = patient_df[patient_df['Patient'].isin(patients_with_masks)]\
-        ['unique_id'].unique().tolist() # like ID00007637202177411956430___7
+    images_list = [os.path.splitext(f)[0]
+                   for f in os.listdir(LOCAL_PATIENT_MASKS_DIR)]
+    # like ID00007637202177411956430
+    patients_with_masks = list(set([p.split('_')[0] for p in images_list]))
+    patient_keys = patient_df[patient_df['Patient'].isin(
+        patients_with_masks)]['unique_id'].unique().tolist()  # like ID00007637202177411956430___7
 
     # run FVC through standardization pipeline
     fvc_pipeline = get_postproc_pipeline(num_attrs=['FVC'])
@@ -111,17 +111,20 @@ def load_training_datagenerators(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_
     # get partition and labels dicts for datagenerator class
     partition = {}                  # {'train':[<ids>], 'validation':[<ids>]}
     labels = {}                     # {<id>:y_true, ...}
-    patient_slices_library = None   # {<patient_id_sans_weeks>:<list of sorted np arrays>} # only used if in_memory is true
+    # {<patient_id_sans_weeks>:<list of sorted np arrays>} # only used if in_memory is true
+    patient_slices_library = None
 
     # assign patient slices to patient_slices_memory if we can train in memory
     if in_memory:
         patient_slices_library = {}
         print('Loading patient data')
         for patient in tqdm(patients_with_masks):
-            patient_image_files = [f for f in os.listdir(LOCAL_PATIENT_MASKS_DIR) if patient in f]
-            patient_image_files.sort(key=lambda x: int(os.path.splitext(x)[0].split('_')[-1]))
-            patient_slices_library[patient] = [np.load(os.path.join(LOCAL_PATIENT_MASKS_DIR, f)) for f in patient_image_files]
-
+            patient_image_files = [f for f in os.listdir(
+                LOCAL_PATIENT_MASKS_DIR) if patient in f]
+            patient_image_files.sort(key=lambda x: int(
+                os.path.splitext(x)[0].split('_')[-1]))
+            patient_slices_library[patient] = [np.load(os.path.join(
+                LOCAL_PATIENT_MASKS_DIR, f)) for f in patient_image_files]
 
     # Assign train/validation keys
     random.shuffle(patient_keys)
@@ -138,7 +141,7 @@ def load_training_datagenerators(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_
     tab_pipeline = get_postproc_pipeline(
         no_op_attrs, num_attrs, cat_attrs, encoded_attrs)
     X = tab_pipeline.fit_transform(patient_df).toarray()
-    for unique_id, arr in zip(patient_df['unique_id'].values, X): # [key, val]
+    for unique_id, arr in zip(patient_df['unique_id'].values, X):  # [key, val]
         tab_data[unique_id] = arr
 
     training_generator = myDataGenerator(
@@ -154,7 +157,7 @@ def load_training_datagenerators(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_
         tab_data=tab_data,
         patient_slices_library=patient_slices_library,
         **datagen_params)
-    
+
     return training_generator, validation_generator, tab_pipeline, fvc_pipeline
 
 
@@ -190,7 +193,7 @@ def train_model(model, training_generator, validation_generator, n_epochs=10, su
     )
 
 
-def load_testing_datagenerator(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_PATH:str, tab_pipeline, in_memory:bool=False):
+def load_testing_datagenerator(LOCAL_PATIENT_MASKS_DIR: str, LOCAL_PATIENT_TAB_PATH: str, tab_pipeline, in_memory: bool = False):
     '''
     returns a generator for the test set
     :param LOCAL_PATIENT_MASKS_DIR: Where to find the masks associated with each patient dicoms
@@ -206,12 +209,12 @@ def load_testing_datagenerator(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_PA
         'dim': (224, 224),
         'batch_size': 1,
         'n_channels': 3,
-        'data_dir':LOCAL_PATIENT_MASKS_DIR
+        'data_dir': LOCAL_PATIENT_MASKS_DIR
     }
 
     # modify patient dataframe to create unique identifiers for each patient
     patient_df = pd.read_csv(LOCAL_PATIENT_TAB_PATH)
-    
+
     # expand input dataframe to contain all weeks
     patient_df = patient_df.drop_duplicates(subset=["Patient"], keep="first")
     min_weeks = -12
@@ -223,25 +226,31 @@ def load_testing_datagenerator(LOCAL_PATIENT_MASKS_DIR:str, LOCAL_PATIENT_TAB_PA
     for week in weeks:
         this_week_duped = [week] * n_test_patients
         new_weeks.extend(this_week_duped)
-    
-    total_df = pd.concat([patient_df] * len (weeks))
+
+    total_df = pd.concat([patient_df] * len(weeks))
     total_df['Weeks'] = new_weeks
     total_df['unique_id'] = total_df['Patient'] + \
         '___' + total_df['Weeks'].astype(str)
 
     # get list of all images - need in order to remove patients that could not be masked
-    images_list = [os.path.splitext(f)[0] for f in os.listdir(LOCAL_PATIENT_MASKS_DIR)]
-    patients_with_masks = list(set([p.split('_')[0] for p in images_list])) # like ID00007637202177411956430
+    images_list = [os.path.splitext(f)[0]
+                   for f in os.listdir(LOCAL_PATIENT_MASKS_DIR)]
+    # like ID00007637202177411956430
+    patients_with_masks = list(set([p.split('_')[0] for p in images_list]))
 
     # assign patient slices to patient_slices_memory if we can train in memory
     patient_slices_library = {}
     print('Loading patient data')
     for patient in tqdm(patients_with_masks):
-        patient_image_files = [f for f in os.listdir(LOCAL_PATIENT_MASKS_DIR) if patient in f]
-        patient_image_files.sort(key=lambda x: int(os.path.splitext(x)[0].split('_')[-1]))
-        patient_slices_library[patient] = [np.load(os.path.join(LOCAL_PATIENT_MASKS_DIR, f)) for f in patient_image_files]
+        patient_image_files = [f for f in os.listdir(
+            LOCAL_PATIENT_MASKS_DIR) if patient in f]
+        patient_image_files.sort(key=lambda x: int(
+            os.path.splitext(x)[0].split('_')[-1]))
+        patient_slices_library[patient] = [np.load(os.path.join(
+            LOCAL_PATIENT_MASKS_DIR, f)) for f in patient_image_files]
 
-    test_datagenerator = myTestDataGenerator(df=total_df, tab_pipeline=tab_pipeline, yield_tuple=True)
+    test_datagenerator = myTestDataGenerator(
+        df=total_df, tab_pipeline=tab_pipeline, data_dir=LOCAL_PATIENT_MASKS_DIR, yield_tuple=True)
 
     return test_datagenerator
 
@@ -264,7 +273,7 @@ def main():
 
     # train model
     train_model(
-        model=model, 
+        model=model,
         training_generator=training_generator,
         validation_generator=validation_generator,
         n_epochs=1000

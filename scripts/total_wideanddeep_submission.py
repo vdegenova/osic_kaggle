@@ -10,7 +10,7 @@ from pipelines import (
     load_pickled_encodings,
 )
 
-from .toolbox import select_predictions
+from toolbox import select_predictions
 from evaluation import evaluate_submission
 import efficientnet_sandbox as efns
 
@@ -19,7 +19,8 @@ def main():
     # flags to assist in kaggle versus development
     is_kaggle_submission = False  # is this a final submission run for kaggle
     do_preproc = False            # should we read from disc and perform preprocessing
-    eval_on_training = True       # is this run on training data (offline eval)
+    # is this run on training data (offline eval)
+    eval_on_training = False
 
     # setting up the respective numpy files for training/test to use if do_preproc is false
     if do_preproc:
@@ -35,6 +36,7 @@ def main():
     if is_kaggle_submission:
         # Kaggle specific file paths
         working_dir = "/kaggle/working/"
+        working_dir_test = "/kaggle/working/test"
         temp_dir = "/kaggle/temp/"
         training_dir = "/kaggle/input/osic-pulmonary-fibrosis-progression/train/"
         training_csv_dir = "/kaggle/input/osic-pulmonary-fibrosis-progression/train.csv"
@@ -44,6 +46,7 @@ def main():
     else:
         # local filepaths
         working_dir = "./working/"
+        working_dir_test = "./working/test"
         temp_dir = "./temp"
         training_dir = "./data/train/"
         training_csv_dir = "./data/train.csv"
@@ -77,7 +80,7 @@ def main():
     SAVE_MASKING_DICT = False
     # Save a slice mask for each slice - generates 32,000 .npy files in <working_dir>/patient_masks_<im_px_size>/
     SAVE_SLICE_MASKS = True
-    N_WIDE_AND_DEEP_EPOCHS = 10
+    N_WIDE_AND_DEEP_EPOCHS = 1
     # whether or not to keep trtaining data in memory for the wide and deep model
     in_memory = True
 
@@ -108,7 +111,7 @@ def main():
                 SAVE_PATIENT_VOLUMES=SAVE_PATIENT_VOLUMES,
                 SAVE_MASKING_DICT=SAVE_MASKING_DICT,
                 SAVE_SLICE_MASKS=SAVE_SLICE_MASKS,
-                working_dir=working_dir
+                working_dir=working_dir_test
             )
 
     ################################################
@@ -119,8 +122,16 @@ def main():
         LOCAL_PATIENT_MASKS_DIR=os.path.join(
             working_dir, f"patient_masks_{img_px_size}/"),
         LOCAL_PATIENT_TAB_PATH=training_csv_dir,
-        in_memory=in_memory,
+        in_memory=in_memory
     )
+
+    if not eval_on_training:
+        test_generator = efns.load_testing_datagenerator(
+            LOCAL_PATIENT_MASKS_DIR=os.path.join(
+                working_dir_test, f"patient_masks_{img_px_size}/"),
+            LOCAL_PATIENT_TAB_PATH=test_csv_dir,
+            tab_pipeline=tab_pipeline,
+            in_memory=in_memory)
 
     model = efns.build_wide_and_deep()
     model.summary()
@@ -141,12 +152,14 @@ def main():
     # It uses conf_func to calculate the confidence of that prediction @ patient-week granularity
     # It expects the data generators to return batches @ 1 patient-week granularity and to generate all required batches
     # It expects the data generator to return iterables of [patient_id, week, [model-compliant-batch]]
-    # It returns a pd.DataFrame in the submission format 
+    # It returns a pd.DataFrame in the submission format
 
     if eval_on_training:
-        results_df = select_predictions(model, training_generator, eval_func="mean", conf_func="std", verbose="True")
+        results_df = select_predictions(
+            model, training_generator, eval_func="mean", conf_func="std", verbose="True")
     else:
-        results_df = select_predictions(model, validation_generator, eval_func="mean", conf_func="std", verbose="True")
+        results_df = select_predictions(
+            model, test_generator, eval_func="mean", conf_func="std", verbose="True")
 
     ################################################
     # 4. generate output file

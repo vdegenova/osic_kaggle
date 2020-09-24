@@ -21,7 +21,8 @@ class myTestDataGenerator(keras.utils.Sequence):
         df (pd.DataFrame): the testing df which includes 'Patient' as well as unpipelined patient data
         tab_pipeline (sklearn.pipeline.Pipeline): a trained pipeline to run the test tab data through
     '''
-    def __init__(self, df, tab_pipeline, data_dir, dim=(224,224,3), n_channels=1,
+
+    def __init__(self, df, tab_pipeline, data_dir, dim=(224, 224, 3), n_channels=1,
                  patient_slices_library={}, n_classes=None, shuffle=False, yield_tuple=False):
         self.dim = dim
         self.batch_size = 1
@@ -39,7 +40,6 @@ class myTestDataGenerator(keras.utils.Sequence):
     def __len__(self):
         '''Denotes the number of batches per epoch'''
         return int(np.floor(len(self.list_ids) / self.batch_size))
-    
 
     def __getitem__(self, index):
         '''Generate one batch of data'''
@@ -54,16 +54,14 @@ class myTestDataGenerator(keras.utils.Sequence):
 
         return X, y
 
-
     def on_epoch_end(self):
         '''Updates indexes after each epoch'''
         self.indexes = np.arange(len(self.list_ids))
         if self.shuffle == True:
             np.random.shuffle(self.indexes)
 
-
     def __data_generation(self, list_ids_temp):
-        '''Generates data containing batch_size samples''' # X : (n_samples, *dim, n_channels)
+        '''Generates data containing batch_size samples'''  # X : (n_samples, *dim, n_channels)
         # each item of X needs to be a tuple. The first item can be the image, the second must be tabular
         # Initialization
 
@@ -77,13 +75,13 @@ class myTestDataGenerator(keras.utils.Sequence):
         x_imgs = np.empty((pseudo_batch, *self.dim, self.n_channels))
 
         # get tabular data
-        patient_df = self.df[self.df['unique_id']==ID]
+        patient_df = self.df[self.df['unique_id'] == ID]
         post_pipeline_tab = self.tab_pipeline.transform(patient_df)
         x_tab = np.stack((post_pipeline_tab,)*pseudo_batch, axis=0)
-        
+
         # get image data
         # read in-memory
-        for i, greyscale_img in enumerate(self.patient_slices_library[patient_id_no_weeks])
+        for i, greyscale_img in enumerate(self.patient_slices_library[patient_id_no_weeks]):
             try:
                 assert not np.any(np.isnan(greyscale_img))
             except AssertionError as e:
@@ -91,11 +89,13 @@ class myTestDataGenerator(keras.utils.Sequence):
                 raise
 
             if self.n_channels > 1:
-                x_imgs[i,] = np.stack((greyscale_img,)*self.n_channels, axis=-1) # here I am making 1 channel into x duplicate channels
+                # here I am making 1 channel into x duplicate channels
+                x_imgs[i, ] = np.stack(
+                    (greyscale_img,)*self.n_channels, axis=-1)
             else:
-                x_imgs[i,] = greyscale_img
+                x_imgs[i, ] = greyscale_img
 
-        #return X, keras.utils.to_categorical(y, num_classes=self.n_classes) # wont need for regression
+        # return X, keras.utils.to_categorical(y, num_classes=self.n_classes) # wont need for regression
         if self.yield_tuple:
             return (patient_id_no_weeks, weeks, [x_tab, x_imgs])
         else:
