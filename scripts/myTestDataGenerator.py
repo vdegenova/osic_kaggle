@@ -30,12 +30,13 @@ class myTestDataGenerator(keras.utils.Sequence):
         self.n_channels = n_channels
         self.n_classes = n_classes
         self.shuffle = shuffle
-        self.on_epoch_end()
         self.tab_pipeline = tab_pipeline
         self.df = df
         self.patient_slices_library = patient_slices_library
         self.list_ids = df['unique_id'].unique()
         self.yield_tuple = yield_tuple
+        self.on_epoch_end()
+        self.internal_state = 0
 
     def __len__(self):
         '''Denotes the number of batches per epoch'''
@@ -50,13 +51,27 @@ class myTestDataGenerator(keras.utils.Sequence):
         list_ids_temp = [self.list_ids[k] for k in indexes]
 
         # Generate data
-        X, y = self.__data_generation(list_ids_temp)
+        results = self.__data_generation(list_ids_temp)
 
-        return X, y
+        return results
+
+
+    def __iter__(self):
+        return self
+
+
+    def __next__(self):
+        # for i in range(len(self)):
+        #     yield self.__getitem__(i)
+        x = self.__getitem__(self.internal_state)
+        self.internal_state+=1
+        return x
+
 
     def on_epoch_end(self):
         '''Updates indexes after each epoch'''
         self.indexes = np.arange(len(self.list_ids))
+        self.internal_state = 0
         if self.shuffle == True:
             np.random.shuffle(self.indexes)
 
@@ -76,7 +91,7 @@ class myTestDataGenerator(keras.utils.Sequence):
 
         # get tabular data
         patient_df = self.df[self.df['unique_id'] == ID]
-        post_pipeline_tab = self.tab_pipeline.transform(patient_df)
+        post_pipeline_tab = self.tab_pipeline.transform(patient_df).toarray()
         x_tab = np.stack((post_pipeline_tab,)*pseudo_batch, axis=0)
 
         # get image data

@@ -207,7 +207,6 @@ def load_testing_datagenerator(LOCAL_PATIENT_MASKS_DIR: str, LOCAL_PATIENT_TAB_P
     '''
     datagen_params = {
         'dim': (224, 224),
-        'batch_size': 1,
         'n_channels': 3,
         'data_dir': LOCAL_PATIENT_MASKS_DIR
     }
@@ -231,6 +230,7 @@ def load_testing_datagenerator(LOCAL_PATIENT_MASKS_DIR: str, LOCAL_PATIENT_TAB_P
     total_df['Weeks'] = new_weeks
     total_df['unique_id'] = total_df['Patient'] + \
         '___' + total_df['Weeks'].astype(str)
+    total_df = total_df.sort_values(['Patient','Weeks'], ascending=True)
 
     # get list of all images - need in order to remove patients that could not be masked
     images_list = [os.path.splitext(f)[0]
@@ -250,7 +250,12 @@ def load_testing_datagenerator(LOCAL_PATIENT_MASKS_DIR: str, LOCAL_PATIENT_TAB_P
             LOCAL_PATIENT_MASKS_DIR, f)) for f in patient_image_files]
 
     test_datagenerator = myTestDataGenerator(
-        df=total_df, tab_pipeline=tab_pipeline, data_dir=LOCAL_PATIENT_MASKS_DIR, yield_tuple=True)
+        df=total_df,
+        tab_pipeline=tab_pipeline,
+        patient_slices_library=patient_slices_library,
+        yield_tuple=True,
+        **datagen_params
+        )
 
     return test_datagenerator
 
@@ -278,6 +283,14 @@ def main():
         validation_generator=validation_generator,
         n_epochs=1000
     )
+
+    # # test testing data generator
+    # test_generator = load_testing_datagenerator(
+    #     LOCAL_PATIENT_MASKS_DIR=LOCAL_PATIENT_MASKS_DIR,
+    #     LOCAL_PATIENT_TAB_PATH=LOCAL_PATIENT_TAB_PATH,
+    #     tab_pipeline=tab_pipeline
+    # )
+    # print('Ready to test - put break here')
 
 
 if __name__ == '__main__':
