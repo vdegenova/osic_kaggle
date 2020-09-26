@@ -80,7 +80,7 @@ def main():
     SAVE_MASKING_DICT = False
     # Save a slice mask for each slice - generates 32,000 .npy files in <working_dir>/patient_masks_<im_px_size>/
     SAVE_SLICE_MASKS = True
-    N_WIDE_AND_DEEP_EPOCHS = 0
+    N_WIDE_AND_DEEP_EPOCHS = 1
     # whether or not to keep trtaining data in memory for the wide and deep model
     in_memory = True
 
