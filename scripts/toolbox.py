@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 from collections import defaultdict
 
+
 def get_patient_data(csv_path, patient_ids=None):
     """Returns the medical data associated with the provided patient_id,
         or for all patients if not provided.
@@ -49,17 +50,18 @@ def get_patient_dicoms(dicom_path, patient_ids=None, sort_slices=True):
         # Known issues with some DICOMs prevent processing; skip them
         try:
             patient_path = f"{dicom_path}/{pid}"
-            slices = [pydicom.read_file(f"{patient_path}/{s}") for s in os.listdir(patient_path)]
+            slices = [pydicom.read_file(f"{patient_path}/{s}")
+                      for s in os.listdir(patient_path)]
             if sort_slices:
                 # sorts DICOMS by caudial (ass) to cranial (head)
                 slices.sort(key=lambda x: int(x.ImagePositionPatient[2]))
 
             patient_dicoms[pid] = slices
-        except Exception as err:  #pylint: disable=broad-except
+        except Exception as err:  # pylint: disable=broad-except
             print("Something bad happened!")
             print(err)
             print(f"Skipping patient {pid} & continuing...")
-            continue # Keep processing other DICOMs
+            continue  # Keep processing other DICOMs
 
     return patient_dicoms
 
@@ -84,6 +86,7 @@ def score_prediction(real, pred, conf, min_conf=70, max_err=1000):
     bounded_conf = np.maximum(conf, min_conf)
     bounded_err = np.minimum(np.abs(real - pred), max_err)
     return -(np.sqrt(2) * bounded_err / bounded_conf) - np.log(np.sqrt(2) * bounded_conf)
+
 
 def select_predictions(model, data_generator, eval_func="mean", eval_lambda=None, conf_func="std", conf_lambda=None, verbose=False):
     """Iteratively uses :model: and :data_generator: to make FVC predictions on sets of patient DICOMs.
@@ -130,21 +133,24 @@ def select_predictions(model, data_generator, eval_func="mean", eval_lambda=None
         conf_func = conf_functions[conf_func]
 
     if verbose:
-        print(f"Using eval function: {eval_func} and confidence function: {conf_func}")
+        print(
+            f"Using eval function: {eval_func} and confidence function: {conf_func}")
 
-    patient_predictions = pd.DataFrame([], columns=["Patient_Week", "FVC", "Confidence"])
+    patient_predictions = pd.DataFrame(
+        [], columns=["Patient_Week", "FVC", "Confidence"])
 
     # Each batch is an array of [biographics, DICOM encodings] for a single week of a single patient
     for patient_id, week, batch in data_generator:
         # Each batch-prediction returns an array of predictions, 1 per DICOM encoding
-        predictions = model.predict_batch(batch)
+        predictions = model.predict_on_batch(batch)
         # Select which DICOM-prediction to use for this patient-week
         selection = eval_func(predictions)
         # Generate the confidence of the DICOM-prediction for the patient-week
         conf = conf_func(predictions)
 
         if verbose:
-            print(f"Selected FVC prediction for patient {patient_id} on week {week}: {selection}, confidence {conf}")
+            print(
+                f"Selected FVC prediction for patient {patient_id} on week {week}: {selection}, confidence {conf}")
 
         patient_week = patient_id + week
         patient_predictions.append([patient_week, selection, conf])
