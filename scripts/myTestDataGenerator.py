@@ -63,9 +63,12 @@ class myTestDataGenerator(keras.utils.Sequence):
     def __next__(self):
         # for i in range(len(self)):
         #     yield self.__getitem__(i)
-        x = self.__getitem__(self.internal_state)
-        self.internal_state+=1
-        return x
+        if self.internal_state < len(self):
+            x = self.__getitem__(self.internal_state)
+            self.internal_state+=1
+            return x
+        else:
+            raise StopIteration
 
 
     def on_epoch_end(self):
