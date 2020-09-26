@@ -142,7 +142,7 @@ def select_predictions(model, data_generator, eval_func="mean", eval_lambda=None
     # Each batch is an array of [biographics, DICOM encodings] for a single week of a single patient
     for patient_id, week, batch in data_generator:
         # Each batch-prediction returns an array of predictions, 1 per DICOM encoding
-        predictions = model.predict_on_batch(batch)
+        predictions = model.predict_on_batch([np.squeeze(batch[0]), batch[1]])
         # Select which DICOM-prediction to use for this patient-week
         selection = eval_func(predictions)
         # Generate the confidence of the DICOM-prediction for the patient-week
