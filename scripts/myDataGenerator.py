@@ -21,7 +21,7 @@ class myDataGenerator(keras.utils.Sequence):
         n_classes (int): not used for regression
     '''
     def __init__(self, list_ids, labels, data_dir, tab_data, batch_size=32, dim=(224,224,3), n_channels=1,
-                 tab_data_dim=7, patient_slices_library={}, n_classes=None, shuffle=True):
+                 tab_data_dim=8, patient_slices_library={}, n_classes=None, shuffle=True):
         self.dim = dim
         self.batch_size = batch_size
         self.labels = labels

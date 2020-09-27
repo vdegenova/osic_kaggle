@@ -41,7 +41,7 @@ sys.path.append('./src/')
 def build_wide_and_deep(
     img_input_shape: Tuple[int, int, int] = (224, 224, 3),
     weights='noisy-student',
-    tab_input_shape: Tuple[int, ] = (7,),
+    tab_input_shape: Tuple[int, ] = (8,),
 ):
     '''
     Builds a wide and deep model by concatenating a base efficientnet model --with a vector of tabular data
@@ -261,7 +261,7 @@ def load_testing_datagenerator(LOCAL_PATIENT_MASKS_DIR: str, LOCAL_PATIENT_TAB_P
 
 
 def main():
-    LOCAL_PATIENT_TAB_PATH = "./data/train.csv"
+    LOCAL_PATIENT_TAB_PATH = "./data/train_mod.csv" # ADD "_mod" IF USING ADDITIONAL CALCULATED FEATURES LIKE TRAPZ_VOL
     LOCAL_PATIENT_MASKS_DIR = "./data/processed_data/patient_masks_224/"
     in_memory = True
 
