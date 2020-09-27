@@ -13,6 +13,7 @@ from pipelines import (
 from toolbox import select_predictions
 from evaluation import evaluate_submission
 import efficientnet_sandbox as efns
+import tensorflow as tf
 
 
 def main():
@@ -21,6 +22,9 @@ def main():
     do_preproc = False            # should we read from disc and perform preprocessing
     # is this run on training data (offline eval)
     eval_on_training = False
+
+    # GPU check
+    print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
 
     # setting up the respective numpy files for training/test to use if do_preproc is false
     if do_preproc:
