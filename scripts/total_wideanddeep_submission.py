@@ -19,12 +19,13 @@ import tensorflow as tf
 def main():
     # flags to assist in kaggle versus development
     is_kaggle_submission = False  # is this a final submission run for kaggle
-    do_preproc = False            # should we read from disc and perform preprocessing
+    do_preproc = True            # should we read from disc and perform preprocessing
     # is this run on training data (offline eval)
     eval_on_training = False
 
     # GPU check
-    print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
+    print("Num GPUs Available: ", len(
+        tf.config.experimental.list_physical_devices('GPU')))
 
     # setting up the respective numpy files for training/test to use if do_preproc is false
     if do_preproc:
@@ -84,7 +85,7 @@ def main():
     SAVE_MASKING_DICT = False
     # Save a slice mask for each slice - generates 32,000 .npy files in <working_dir>/patient_masks_<im_px_size>/
     SAVE_SLICE_MASKS = True
-    N_WIDE_AND_DEEP_EPOCHS = 1
+    N_WIDE_AND_DEEP_EPOCHS = 200
     # whether or not to keep trtaining data in memory for the wide and deep model
     in_memory = True
 
@@ -93,7 +94,7 @@ def main():
     ################################################
     # we only read in data from disc if do_preproc is set to true, otherwise we use the numpy files that are set above
     if do_preproc:
-        patient_training_volumes, patient_training_masking_dict = read_in_data(
+        patient_training_volumes, patient_training_masking_dict, trapz_vol_dict_train = read_in_data(
             csv_path=training_csv_dir,
             patient_dir=training_dir,
             img_px_size=img_px_size,
@@ -102,21 +103,51 @@ def main():
             SAVE_PATIENT_VOLUMES=SAVE_PATIENT_VOLUMES,
             SAVE_MASKING_DICT=SAVE_MASKING_DICT,
             SAVE_SLICE_MASKS=SAVE_SLICE_MASKS,
-            working_dir=working_dir
+            working_dir=working_dir,
+            SAVE_TRAPEZOID_VOLUMES=True
         )
 
-        if not eval_on_training:
-            patient_test_volumes, patient_test_masking_dict = read_in_data(
-                csv_path=test_csv_dir,
-                patient_dir=test_dir,
-                img_px_size=img_px_size,
-                slice_count=slice_count,
-                verbose=True,
-                SAVE_PATIENT_VOLUMES=SAVE_PATIENT_VOLUMES,
-                SAVE_MASKING_DICT=SAVE_MASKING_DICT,
-                SAVE_SLICE_MASKS=SAVE_SLICE_MASKS,
-                working_dir=working_dir_test
-            )
+        # load train.csv and add calculated column, save as new
+        df = pd.read_csv(training_csv_dir)
+        df['TRAPZ_VOL'] = np.nan
+        df['TRAPZ_VOL'] = df['Patient'].map(trapz_vol_dict_train)
+
+        filestring_train = os.path.splitext(
+            training_csv_dir)[0] + '_mod' + os.path.splitext(training_csv_dir)[1]
+        df.to_csv(filestring_train, index=False)
+
+        training_csv_dir = filestring_train
+    else:
+        training_csv_dir = os.path.splitext(
+            training_csv_dir)[0] + '_mod' + os.path.splitext(training_csv_dir)[1]
+
+    if not eval_on_training:
+        patient_test_volumes, patient_test_masking_dict, trapz_vol_dict_test = read_in_data(
+            csv_path=test_csv_dir,
+            patient_dir=test_dir,
+            img_px_size=img_px_size,
+            slice_count=slice_count,
+            verbose=True,
+            SAVE_PATIENT_VOLUMES=SAVE_PATIENT_VOLUMES,
+            SAVE_MASKING_DICT=SAVE_MASKING_DICT,
+            SAVE_SLICE_MASKS=SAVE_SLICE_MASKS,
+            working_dir=working_dir_test,
+            SAVE_TRAPEZOID_VOLUMES=True
+        )
+
+        # load train.csv and add calculated column, save as new
+        df = pd.read_csv(test_csv_dir)
+        df['TRAPZ_VOL'] = np.nan
+        df['TRAPZ_VOL'] = df['Patient'].map(trapz_vol_dict_test)
+
+        filestring_test = os.path.splitext(
+            test_csv_dir)[0] + '_mod' + os.path.splitext(test_csv_dir)[1]
+        df.to_csv(filestring_test, index=False)
+
+        test_csv_dir = filestring_test
+    else:
+        test_csv_dir = os.path.splitext(
+            test_csv_dir)[0] + '_mod' + os.path.splitext(test_csv_dir)[1]
 
     ################################################
     # 2. train wide and deep model  (training data)
@@ -164,6 +195,12 @@ def main():
     else:
         results_df = select_predictions(
             model, test_generator, eval_func="mean", conf_func="std", verbose="True")
+
+    results_df.FVC = pd.Series(np.squeeze(fvc_pipeline.transformer_list[-1][-1].steps[-1][-1].inverse_transform(
+        np.array([results_df.FVC.values]))))
+
+    results_df.Confidence = pd.Series(np.squeeze(fvc_pipeline.transformer_list[-1][-1].steps[-1][-1].inverse_transform(
+        np.array([results_df.Confidence.values]))))
 
     ################################################
     # 4. generate output file

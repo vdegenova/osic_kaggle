@@ -88,7 +88,7 @@ def score_prediction(real, pred, conf, min_conf=70, max_err=1000):
     return -(np.sqrt(2) * bounded_err / bounded_conf) - np.log(np.sqrt(2) * bounded_conf)
 
 
-def select_predictions(model, data_generator, eval_func="mean", eval_lambda=None, conf_func="std", conf_lambda=None, verbose=False):
+def select_predictions(model, data_generator, eval_func="mean", eval_lambda=None, conf_func="std", conf_lambda=None, verbose=False, num=np.Inf):
     """Iteratively uses :model: and :data_generator: to make FVC predictions on sets of patient DICOMs.
         Uses statistical measures to select a scalar prediction & calculate the inference confidence
 
@@ -139,8 +139,10 @@ def select_predictions(model, data_generator, eval_func="mean", eval_lambda=None
     patient_predictions = pd.DataFrame(
         [], columns=["Patient_Week", "FVC", "Confidence"])
 
+    count = 0
     # Each batch is an array of [biographics, DICOM encodings] for a single week of a single patient
     for patient_id, week, batch in data_generator:
+        count += 1
         # Each batch-prediction returns an array of predictions, 1 per DICOM encoding
         predictions = model.predict_on_batch([np.squeeze(batch[0]), batch[1]])
         # Select which DICOM-prediction to use for this patient-week
@@ -155,5 +157,7 @@ def select_predictions(model, data_generator, eval_func="mean", eval_lambda=None
         patient_week = patient_id + week
         patient_predictions = patient_predictions.append(
             {'Patient_Week': patient_week, 'FVC': selection, 'Confidence': conf}, ignore_index=True)
+        if count > num:
+            break
 
     return patient_predictions
