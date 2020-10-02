@@ -154,7 +154,7 @@ def select_predictions(model, data_generator, eval_func="mean", eval_lambda=None
             print(
                 f"Selected FVC prediction for patient {patient_id} on week {week}: {selection}, confidence {conf}")
 
-        patient_week = patient_id + week
+        patient_week = patient_id + "_" + week
         patient_predictions = patient_predictions.append(
             {'Patient_Week': patient_week, 'FVC': selection, 'Confidence': conf}, ignore_index=True)
         if count > num:
