@@ -10,24 +10,24 @@ from pipelines import (
     load_pickled_encodings,
 )
 
-import sys
-import subprocess
-subprocess.check_call([sys.executable,
-                       '-m', 
-                       'pip', 
-                       'install', 
-                       '../input/kerasapplications/keras-team-keras-applications-3b180cb', 
-                       '-f', 
-                       './', 
-                       '--no-index'])
-subprocess.check_call([sys.executable,
-                       '-m', 
-                       'pip', 
-                       'install', 
-                       '../input/efficientnet/efficientnet-1.1.0', 
-                       '-f', 
-                       './', 
-                       '--no-index'])
+# import sys
+# import subprocess
+# subprocess.check_call([sys.executable,
+#                        '-m', 
+#                        'pip', 
+#                        'install', 
+#                        '../input/kerasapplications/keras-team-keras-applications-3b180cb', 
+#                        '-f', 
+#                        './', 
+#                        '--no-index'])
+# subprocess.check_call([sys.executable,
+#                        '-m', 
+#                        'pip', 
+#                        'install', 
+#                        '../input/efficientnet/efficientnet-1.1.0', 
+#                        '-f', 
+#                        './', 
+#                        '--no-index'])
 
 from toolbox import select_predictions
 # from evaluation import evaluate_submission
@@ -71,11 +71,11 @@ def main():
         # local filepaths
         working_dir = "./working/"
         working_dir_test = "./working/test"
-        temp_dir = "./temp"
-        training_dir = "./data/train/"
-        training_csv_dir = "./data/train.csv"
-        test_dir = "./data/test/"
-        test_csv_dir = "./data/test.csv"
+        temp_dir = "../temp"
+        training_dir = "../data/train/"
+        training_csv_dir = "../data/train.csv"
+        test_dir = "../data/test/"
+        test_csv_dir = "../data/test.csv"
 
         substr = ""
         if eval_on_training:

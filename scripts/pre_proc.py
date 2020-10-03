@@ -269,9 +269,6 @@ def process_patient(
     relevant_side_info = patient_history_df[[
         "Patient", "Weeks", "FVC", "Percent"]]
 
-    if verbose:
-        print(f"Patient {patient}")
-
     # Calculate volume in mm^3
     scalar_lung_volume = np.trapz(lung_areas, x=np.cumsum(dz_arr))
 
@@ -324,8 +321,7 @@ def read_in_data(
     trapz_vol_dict = {}
 
     for num, patient in enumerate(patients[:]):
-        if num % 10 == 0:
-            print("Patient:" + str(num))
+        print(f'[{num}/{len(patients)}]: Patient {patient}')
         patient_history_df = train_df[train_df.Patient == patient].sort_values(
             by="Weeks"
         )
