@@ -124,7 +124,7 @@ def load_training_datagenerators(LOCAL_PATIENT_MASKS_DIR: str, LOCAL_PATIENT_TAB
             patient_image_files.sort(key=lambda x: int(
                 os.path.splitext(x)[0].split('_')[-1]))
             patient_slices_library[patient] = [np.load(os.path.join(
-                LOCAL_PATIENT_MASKS_DIR, f)) for f in patient_image_files]
+                LOCAL_PATIENT_MASKS_DIR, f)).astype(np.float32) for f in patient_image_files]
 
     # Assign train/validation keys
     random.shuffle(patient_keys)
@@ -247,7 +247,7 @@ def load_testing_datagenerator(LOCAL_PATIENT_MASKS_DIR: str, LOCAL_PATIENT_TAB_P
         patient_image_files.sort(key=lambda x: int(
             os.path.splitext(x)[0].split('_')[-1]))
         patient_slices_library[patient] = [np.load(os.path.join(
-            LOCAL_PATIENT_MASKS_DIR, f)) for f in patient_image_files]
+            LOCAL_PATIENT_MASKS_DIR, f)).astype(np.float32) for f in patient_image_files]
 
     test_datagenerator = myTestDataGenerator(
         df=total_df,

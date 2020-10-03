@@ -283,7 +283,7 @@ def process_patient(
         for i in range(resized_volume.shape[0]):
             filestring = f"{masked_dir}{patient}_{i}.npy"
             np.save(filestring, resized_volume[i, :, :].astype(
-                dtype=np.float32))
+                dtype=np.float16))
 
     return resized_volume, relevant_side_info, scalar_lung_volume
 
