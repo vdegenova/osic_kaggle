@@ -11,7 +11,7 @@ from pipelines import (
 )
 
 from toolbox import select_predictions
-from evaluation import evaluate_submission
+# from evaluation import evaluate_submission
 import efficientnet_sandbox as efns
 import tensorflow as tf
 
@@ -217,9 +217,9 @@ def main():
     ################################################
     # 8. evaluate output file if necessary
     ################################################
-    if eval_on_training:
-        metric = evaluate_submission(results_df)
-        print(f'Laplace Log Likelihood: {metric}')
+    # if eval_on_training:
+    # metric = evaluate_submission(results_df)
+    # print(f'Laplace Log Likelihood: {metric}')
 
 
 if __name__ == "__main__":
