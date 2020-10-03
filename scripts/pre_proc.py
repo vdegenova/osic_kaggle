@@ -320,8 +320,8 @@ def read_in_data(
     patient_masking_dict = {}
     trapz_vol_dict = {}
 
-    for num, patient in enumerate(patients[:]):
-        print(f'[{num}/{len(patients)}]: Patient {patient}')
+    for num, patient in enumerate(patients[:5]):
+        print(f'[{num+1}/{len(patients)}]: Patient {patient}')
         patient_history_df = train_df[train_df.Patient == patient].sort_values(
             by="Weeks"
         )

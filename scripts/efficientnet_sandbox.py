@@ -161,7 +161,7 @@ def load_training_datagenerators(LOCAL_PATIENT_MASKS_DIR: str, LOCAL_PATIENT_TAB
     return training_generator, validation_generator, tab_pipeline, fvc_pipeline
 
 
-def train_model(model, training_generator, validation_generator, n_epochs=10, suffix=None):
+def train_model(model, training_generator, validation_generator, n_epochs=10, suffix=None, with_callbacks=True):
     '''
     ::param model:: model to train
     ::param training_generator:: training batch generator - feeds image and tabular data
@@ -170,18 +170,23 @@ def train_model(model, training_generator, validation_generator, n_epochs=10, su
     ::param suffix:: custom string to add to model
     '''
 
-    # prepare model checkpoint callback
-    now = datetime.datetime.now().isoformat(timespec="minutes")
-    model_checkpoint_callback = ModelCheckpoint(
-        filepath=f'./models/wide_and_deep_model_{"" if suffix is None else suffix}_{now}',
-        monitor="val_loss",
-        save_best_only=True,
-    )
-    # prepare tensorboard callback
-    log_dir = "/tmp/wide_and_deep/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    tensorboard_callback = TensorBoard(
-        log_dir=log_dir, histogram_freq=10
-    )  # call tensorboard with `tensorboard --logdir /tmp/wide_and_deep` from your env
+    if with_callbacks:
+        # prepare model checkpoint callback
+        now = datetime.datetime.now().isoformat(timespec="minutes")
+        model_checkpoint_callback = ModelCheckpoint(
+            filepath=f'./models/wide_and_deep_model_{"" if suffix is None else suffix}_{now}',
+            monitor="val_loss",
+            save_best_only=True,
+        )
+        # prepare tensorboard callback
+        log_dir = "/tmp/wide_and_deep/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        tensorboard_callback = TensorBoard(
+            log_dir=log_dir, histogram_freq=10
+        )  # call tensorboard with `tensorboard --logdir /tmp/wide_and_deep` from your env
+        
+        callbacks = [tensorboard_callback, model_checkpoint_callback]
+    else:
+        callbacks = None
 
     # train
     model.fit(
@@ -189,7 +194,7 @@ def train_model(model, training_generator, validation_generator, n_epochs=10, su
         epochs=n_epochs,
         verbose=1,
         validation_data=validation_generator,
-        callbacks=[tensorboard_callback, model_checkpoint_callback]
+        callbacks=callbacks
     )
 
 

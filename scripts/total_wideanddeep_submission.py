@@ -163,7 +163,7 @@ def main():
         # this block instead saves train_mod.csv to the working_dir
         filename_ext_tuple_test = os.path.splitext(os.path.split(test_csv_dir)[-1])
         filestring_test = os.path.join(working_dir, filename_ext_tuple_test[0]+'_mod'+filename_ext_tuple_test[1])
-        df.to_csv(filestring_train, index=False)
+        df.to_csv(filestring_test, index=False)
 
         test_csv_dir = filestring_test
     else:
@@ -189,14 +189,20 @@ def main():
             tab_pipeline=tab_pipeline,
             in_memory=in_memory)
 
-    model = efns.build_wide_and_deep()
+    if is_kaggle_submission:
+        model = efns.build_wide_and_deep(
+            weights='../input/efficientnet-weights-for-keras/noisy-student/notop/efficientnet-b0_noisy-student_notop.h5'
+        )
+    else:
+        model = efns.build_wide_and_deep()
     model.summary()
 
     # train model
     efns.train_model(model=model,
                      training_generator=training_generator,
                      validation_generator=validation_generator,
-                     n_epochs=N_WIDE_AND_DEEP_EPOCHS
+                     n_epochs=N_WIDE_AND_DEEP_EPOCHS,
+                     with_callbacks=False
                      )
 
     ################################################
