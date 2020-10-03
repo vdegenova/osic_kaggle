@@ -393,8 +393,13 @@ def save_to_disk(patient_volumes=None,
         df['TRAPZ_VOL'] = np.nan
         df['TRAPZ_VOL'] = df['Patient'].map(trapz_vol_dict)
 
-        filestring = os.path.splitext(
-            csv_path)[0] + '_mod' + os.path.splitext(csv_path)[1]
+        # filestring = os.path.splitext(
+        #     csv_path)[0] + '_mod' + os.path.splitext(csv_path)[1]
+        # df.to_csv(filestring, index=False)
+
+        # this block instead saves train_mod.csv to the working_dir
+        filename_ext_tuple = os.path.splitext(os.path.split(csv_path)[-1])
+        filestring = os.path.join(working_dir, filename_ext_tuple[0]+'_mod'+filename_ext_tuple[1])
         df.to_csv(filestring, index=False)
 
     return filestring

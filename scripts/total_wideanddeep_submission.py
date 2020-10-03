@@ -10,6 +10,25 @@ from pipelines import (
     load_pickled_encodings,
 )
 
+import sys
+import subprocess
+subprocess.check_call([sys.executable,
+                       '-m', 
+                       'pip', 
+                       'install', 
+                       '../input/kerasapplications/keras-team-keras-applications-3b180cb', 
+                       '-f', 
+                       './', 
+                       '--no-index'])
+subprocess.check_call([sys.executable,
+                       '-m', 
+                       'pip', 
+                       'install', 
+                       '../input/efficientnet/efficientnet-1.1.0', 
+                       '-f', 
+                       './', 
+                       '--no-index'])
+
 from toolbox import select_predictions
 # from evaluation import evaluate_submission
 import efficientnet_sandbox as efns
@@ -112,8 +131,9 @@ def main():
         df['TRAPZ_VOL'] = np.nan
         df['TRAPZ_VOL'] = df['Patient'].map(trapz_vol_dict_train)
 
-        filestring_train = os.path.splitext(
-            training_csv_dir)[0] + '_mod' + os.path.splitext(training_csv_dir)[1]
+        # this block instead saves train_mod.csv to the working_dir
+        filename_ext_tuple_train = os.path.splitext(os.path.split(training_csv_dir)[-1])
+        filestring_train = os.path.join(working_dir, filename_ext_tuple_train[0]+'_mod'+filename_ext_tuple_train[1])
         df.to_csv(filestring_train, index=False)
 
         training_csv_dir = filestring_train
@@ -140,9 +160,10 @@ def main():
         df['TRAPZ_VOL'] = np.nan
         df['TRAPZ_VOL'] = df['Patient'].map(trapz_vol_dict_test)
 
-        filestring_test = os.path.splitext(
-            test_csv_dir)[0] + '_mod' + os.path.splitext(test_csv_dir)[1]
-        df.to_csv(filestring_test, index=False)
+        # this block instead saves train_mod.csv to the working_dir
+        filename_ext_tuple_test = os.path.splitext(os.path.split(test_csv_dir)[-1])
+        filestring_test = os.path.join(working_dir, filename_ext_tuple_test[0]+'_mod'+filename_ext_tuple_test[1])
+        df.to_csv(filestring_train, index=False)
 
         test_csv_dir = filestring_test
     else:
