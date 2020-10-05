@@ -9,6 +9,7 @@ from pipelines import (
     get_postproc_pipeline,
     load_pickled_encodings,
 )
+import shutil
 
 # import sys
 # import subprocess
@@ -240,6 +241,16 @@ def main():
     print(results_df.head())
     print(f"Writing Results to {output_filepath}")
     results_df.to_csv(output_filepath, index=False)
+    # delete patient mask npy files...
+    # delete npy masks
+    shutil.rmtree(
+        os.path.join(
+            working_dir, f"patient_masks_{img_px_size}/")
+    )
+    shutil.rmtree(
+        os.path.join(
+            working_dir, 'test', f"patient_masks_{img_px_size}/")
+    )
 
     ################################################
     # 8. evaluate output file if necessary
